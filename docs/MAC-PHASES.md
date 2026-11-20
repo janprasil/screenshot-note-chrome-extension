@@ -15,7 +15,7 @@ vygeneruje prompt pro další fázi podle šablony níže a doplní do něj skut
 - **Ověření:** `./build.sh` (build + self-testy) musí projít. Nová logika dostane self-test spouštěný z `build.sh` (vzor `--folder-transfer-self-test`).
 - **Review na konci fáze**, až když je build zelený a změny commitnuté:
   1. Jeden subagent (`Agent`, typ `general-purpose`). Dej mu jen rozsah (`git diff <base>...HEAD`), cíl fáze a odkaz na `docs/PROTOCOL.md`. Svůj závěr mu nedávej. Ať hledá chyby správnosti, bezpečnosti (socket, oprávnění souborů, redakce) a regrese v ukládání a znovuotevírání session.
-  2. Souběžně Codex přes Bash na pozadí: `codex review --base <base> "Review this branch: <cíl fáze>. Focus on correctness, security, regressions in session save/reopen. Report P1/P2/P3."`
+  2. Souběžně Codex přes Bash na pozadí: `codex review --base <base>`. S `--base` Codex nepřijme vlastní prompt, cíl fáze mu proto nedávej.
   3. Nálezy P1 a P2 oprav. U ostatních oprav nebo stručně zdůvodni. Po opravách znovu `./build.sh`.
 - **Git:** commit s Conventional Commits titulkem (`feat: …`) a patičkou session. Push a PR **až po Janově potvrzení**. Do PR vláken nic nepiš.
 - **Na konci fáze:**

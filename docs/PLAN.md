@@ -8,7 +8,8 @@ network (HAR) a mapu elementů. Element se pak dá vybrat a popsat v anotaci.
 - [x] F1 Rozšíření MV3: recorder konzole, chyb a fetch/XHR (MAIN world), webRequest buffer, redakce, HAR 1.2, bundle, popup, vývojový native host. Unit testy, typecheck a build prošly.
 - [x] F2 (rozšíření) Mapa viditelných elementů s CSS selektory a geometrie viewportu.
 - [ ] Ruční ověření v Chrome: načíst `dist/`, nainstalovat `dev-host`, vyvolat capture.
-- [ ] Mac: helper `screenshot-note-bridge` (stdio ↔ Unix socket), instalace manifestů hostu.
+- [x] Pevné ID vývojového buildu přes `key` v manifestu (`hffkngdjiopodemokmgiedickoiehidb`).
+- [x] Mac F1 (`feat/browser-context-p1`): helper `screenshot-note-bridge` (stdio ↔ Unix socket), socket server `BrowserBridge`, přepínač „Propojení s prohlížečem“ s instalací manifestů hostu, `--bridge-self-test`. Čeká na ruční ověření v Chrome.
 - [ ] Mac: `ContextProvider` při snímku (frontmost Chromium → `capture.request`, timeout 1 s).
 - [ ] Mac: nastavení politiky ve složce/konfiguraci (přepínače z PRIVACY.md).
 - [ ] Mac: uložení `.context.json` + `.har`, placeholder `{context}`, callout pod obrázkem.

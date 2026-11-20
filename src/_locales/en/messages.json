@@ -1,0 +1,14 @@
+{
+  "name": { "message": "Screenshot Note Context" },
+  "description": { "message": "Attaches console, network and page elements to Screenshot Note captures." },
+  "recording": { "message": "Record console and network" },
+  "recordBodies": { "message": "Record response bodies (text and JSON)" },
+  "buffer": { "message": "Keep last" },
+  "minutes": { "message": "min" },
+  "appConnected": { "message": "Connected to Screenshot Note" },
+  "appDisconnected": { "message": "Screenshot Note is not connected" },
+  "reconnect": { "message": "Reconnect" },
+  "export": { "message": "Download context of this tab" },
+  "exportHint": { "message": "Cookies and auth headers are redacted in the download." },
+  "exportFailed": { "message": "Export failed" }
+}

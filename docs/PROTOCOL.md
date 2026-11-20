@@ -32,7 +32,11 @@ Screenshot Note.app ── ContextProvider → přílohy ke snímku
   - Edge: `~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/`
   - Brave: `~/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/`
   - Arc: `~/Library/Application Support/Arc/User Data/NativeMessagingHosts/`
+  - Chromium: `~/Library/Application Support/Chromium/NativeMessagingHosts/`
+  - Zapisuje se jen tam, kde adresář prohlížeče v Application Support existuje.
 - `allowed_origins` obsahuje jen ID rozšíření z Chrome Web Store a ID vývojového buildu.
+- ID vývojového buildu: `hffkngdjiopodemokmgiedickoiehidb` (pevné díky `key` v `src/manifest.json`).
+  Privátní klíč je mimo repo v `~/.config/screenshot-note/chrome-extension-dev.pem`. ID z Chrome Web Store zatím není.
 - `path` míří na `Screenshot Note.app/Contents/MacOS/screenshot-note-bridge`. Po přesunutí appky se manifest přepíše.
 - Pro vývoj existuje `dev-host/` (viz README).
 

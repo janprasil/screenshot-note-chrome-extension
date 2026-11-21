@@ -204,7 +204,19 @@ imageRect   = (screenRect - R.origin) * scaleSnímku
 - DevTools ukotvené dole tento výpočet rozbijí. Přesnější zdroj je
   Accessibility API: `AXWebArea` okna prohlížeče má přesnou pozici obsahu. Pokud
   appka má oprávnění Accessibility, použije ji, jinak výpočet výše.
-- Hit-test v editoru: klik vybere nejmenší element obsahující bod. Opakovaný klik
-  nebo `⌥` posune výběr na rodiče. Hover zvýrazní obrys.
-- Anotace typu `element`: `{selector, tag, name, rect, note}`. Exportuje se pod
-  obrázek jako `` - **Element** `button[data-testid="save"]` „Uložit“: popis ``.
+- Hit-test v editoru: klik vybere nejmenší element obsahující bod (při shodném obdélníku
+  hlubší). Opakovaný klik do vybraného nebo `⌥` posune výběr na rodiče (obsahuje ho
+  a má menší hloubku nebo větší plochu). Hover zvýrazní obrys, Esc rozpracovaný výběr zruší.
+  Nástroj je jen u obrázku, jehož velikost odpovídá `capture` (`rect * imageScale`).
+- Anotace typu `element` v `<obrázek>.annotations.json` (Mac): `Mark` s `tool: 7`, obdélníkem
+  v `points` a `element: {number, selector, tag, name, text}`; popis je v `text`. Starší
+  dokumenty bez `element` se načtou beze změny.
+- Export pod obrázek (za popisek, před callout), seřazeno podle čísla:
+  `` - **[1] Element** `button[data-testid="save"]` „Uložit“: popis ``. Místo `name` se
+  použije `text`, oba se zkrátí na 80 znaků a escapují. Selektor, který by vypadal jako odkaz
+  na obrázek, se nahradí tagem. Řádky se ukládají do popisku relace, po znovuotevření jsou
+  součástí popisku obrázku. Prvky zcela mimo ořez se vynechají.
+  Nová čísla po znovuotevření navazují na nejvyšší `[n] Element` v popisku. Bez kontextu
+  (odebraný, vypnutý politikou) a v cloudu se exportuje jen číslo a popis, bez dat stránky.
+- Ořez v editoru: mapa se ořízne na zachovanou oblast a při exportu se `capture.rect`
+  v `assets/<obrázek>.context.json` posune na oříznutou část, aby mapa seděla i po znovuotevření.

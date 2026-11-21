@@ -94,6 +94,12 @@ až redigovaný výsledek.
 
 Odpověď by měla dorazit do 300 ms. Appka čeká nejvýš 1 s a pak uloží snímek bez kontextu.
 
+Mac appka posílá request všem připojeným prohlížečům s `protocol` 1 (deadline 30 s od startu
+snímání, aby pokryl interaktivní výběr výřezu). Přijme jen bundle, jehož `page.geometry`
+(`screenX`, `screenY`, `outerHeight` přepočtené poměrem `windowBounds.width / outerWidth`) sedí
+na `windowBounds` s tolerancí 8 bodů; ostatní odpovědi bere jako odmítnutí. Bundle bez
+`geometry` se při zadaném `windowBounds` nepřijme.
+
 ## Bundle
 
 ```jsonc
@@ -127,7 +133,7 @@ Redakce probíhá v rozšíření ještě před odesláním. Neredigovaná data 
   odpovídá limitu Chromu). Strop 16 MiB je pod oběma.
 - Content script drží nejvýš 8 Mi znaků záznamů stránky, jednu událost nejvýš 4 Mi znaků.
 
-## Uložení v Mac appce (návrh)
+## Uložení v Mac appce
 
 ```text
 assets/
@@ -136,15 +142,25 @@ assets/
   Bug_1.har
 ```
 
-- Do Markdownu jde nový placeholder `{context}` (souhrn). Obrázek v `{screenshots}`
-  dostane pod poznámkou sbalitelný callout:
+- V pracovní složce draftu leží kontext vedle obrázku jako `<obrázek>.png.context.json`
+  a `<obrázek>.png.har` (0600). `Draft.contexts` mapuje obrázek → soubor kontextu (volitelné pole).
+- Název v `assets/` musí být volný pro `.png`, `.context.json` i `.har` (kolize jako u PNG: `Název-1 2`).
+  Index relace nese hashe všech tří souborů. Znovuotevření najde kontext podle názvu obrázku.
+- Cloudové složky kontext zatím zahodí (upload je F6).
+- Do Markdownu jde nový placeholder `{context}` (souhrn: řádek `- Screenshot N: …` za snímek
+  s kontextem). Výchozí šablona ho nemá. Obrázek v `{screenshots}` dostane pod poznámkou
+  sbalitelný callout (texty ze stránky jen v inline kódu, bez backticků a zalomení):
 
 ```markdown
 > [!bug]- Kontext: https://app.example.com/orders (2 chyby, 1 selhaný request)
 > - `POST /api/orders` → 500
 > - `TypeError: Cannot read properties of undefined (reading 'id')`
-> - [HAR](assets/Bug_1.har) · [konzole](assets/Bug_1.context.json)
+> - [HAR](<assets/Bug_1.har>) · [konzole](<assets/Bug_1.context.json>)
 ```
+
+  U zmenšeného bundle přibude řádek `Zmenšeno kvůli velikosti: bez těl, N requestů…`.
+  Počty v titulku jsou ze `summary` (celá data). Při čtení uložené relace se callout
+  z popisku obrázku odstraní a znovu vygeneruje ze souborů v `assets/`.
 
 ## Mapování elementů na snímek
 

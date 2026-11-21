@@ -11,9 +11,9 @@ network (HAR) a mapu elementů. Element se pak dá vybrat a popsat v anotaci.
 - [x] Opravy z bezpečnostního auditu rozšíření (nálezy 1–8): politika jen přidává redakci, těla jen při zapnutém přepínači, redakce URL v hlavičkách a fragmentech, těla bez surového textu, vzory citlivých jmen, ověření záznamů stránky, strop bundle 16 MiB. Ručně ověřit v Chrome: po zastavení service workeru se při zapnutých tělech dál nahrávají requesty.
 - [x] Pevné ID vývojového buildu přes `key` v manifestu (`hffkngdjiopodemokmgiedickoiehidb`).
 - [x] Mac F1 (`feat/browser-context-p1`): helper `screenshot-note-bridge` (stdio ↔ Unix socket), socket server `BrowserBridge`, přepínač „Propojení s prohlížečem“ s instalací manifestů hostu, `--bridge-self-test`. Čeká na ruční ověření v Chrome.
-- [ ] Mac: `ContextProvider` při snímku (frontmost Chromium → `capture.request`, timeout 1 s).
+- [x] Mac F2 (`feat/browser-context-p2`): při snímku frontmost Chromium → `capture.request` s `windowBounds`, po snímku čeká nejvýš 1 s; přijme jen bundle, jehož `page.geometry` odpovídá cílovému oknu. Kontext v draftu vedle PNG, export `.context.json` + `.har`, callout, `{context}`, reopen, mazání, index s hashi. Cloud kontext zahodí. Test `--context-self-test`. Čeká na ruční ověření v Chrome.
 - [ ] Mac: nastavení politiky ve složce/konfiguraci (přepínače z PRIVACY.md).
-- [ ] Mac: uložení `.context.json` + `.har`, placeholder `{context}`, callout pod obrázkem.
+- [x] Mac: uložení `.context.json` + `.har`, placeholder `{context}`, callout pod obrázkem (F2).
 - [ ] Mac: anotace „Element“: hit-test nad mapou, výběr rodiče, popis, export.
 - [ ] Web/cloud: upload příloh (vypnuto pro cloud), šifrování podle rozhodnutí v PRIVACY.md, zobrazení na webu a v MCP.
 - [ ] Později: těla přes `chrome.debugger` (volitelný režim), Safari Web Extension, Firefox, shadow DOM a iframy v mapě elementů, picker elementu přímo v prohlížeči.

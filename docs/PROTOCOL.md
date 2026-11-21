@@ -169,6 +169,7 @@ assets/
 
 - Politika kontextu cloudové složky platí jen na daném Macu (`CloudContextPolicies` v UserDefaults), výchozí stav vypnuto, zapnutí potvrzuje varování.
 - Job ve frontě nese `attachments: [{index, kind: "context"|"har", bytes, sha256}]` jen pro nové snímky, soubory `<index>.context.json` a `<index>.har` leží vedle PNG v jobu. Strop přílohy je 16 MiB.
+- Kontext pořízený pro jinou složku se ořízne podle politiky cílové složky. Pokud `policy` v bundlu neobsahuje její vlastní `redactHeaders` a `redactQueryParams`, kontext ani HAR se nenahrají.
 - Upload: po commitu relace `PUT /api/v1/sessions/{id}/attachments/{index}/{kind}` (`x-bytes`, `x-sha256`). Opakovaný job pošle přílohy znovu, stejný hash server jen potvrdí.
 - Detail relace má u obrázku `attachments: [{kind, bytes, sha256, path}]`. Prázdný seznam Mac ukládá jako nil, otisk starších relací se nemění.
 - Synchronizace složky zapíše přílohy do `assets/<název>.context.json` a `.har` (0600) a jejich hashe do indexu relace. Odebraná příloha se smaže jen tehdy, když přišla z cloudu.

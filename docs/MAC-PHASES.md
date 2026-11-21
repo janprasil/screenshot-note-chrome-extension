@@ -10,9 +10,9 @@ vygeneruje prompt pro další fázi podle šablony níže a doplní do něj skut
 ## Společná pravidla (platí pro každou fázi)
 
 - **Bez subagentů.** Všechno dělej sám v hlavní session. Jediná výjimka je review na konci fáze.
-- **Šetři kontext.** Čti soubory po rozsazích (`sed -n`, `grep -n`), ne celé, pokud nemusíš. `CloudFolders.swift`, `CloudTests.swift` a `CloudLibrary.swift` čti jen tehdy, když na ně změna přímo sahá. Výstup buildu filtruj (`2>&1 | tail -30`, `grep -E "error|warning|PASS|FAIL"`).
+- **Šetři kontext.** Čti soubory po rozsazích (`sed -n`, `grep -n`), ne celé, pokud nemusíš. Mac zdroje jsou od restrukturalizace v `Sources/` podle oblastí (viz `docs/RESTRUCTURE-PLAN.md` v Mac repu). `Cloud/CloudFolders.swift`, testy v `Sources/ScreenshotNoteTestHost/` a `Cloud/CloudLibrary.swift` čti jen tehdy, když na ně změna přímo sahá. Výstup buildu filtruj (`2>&1 | tail -30`, `grep -E "error|warning|PASS|FAIL"`).
 - **Styl kódu** drž podle okolí: hustý Swift jako v repu, žádné závislosti třetích stran, lokalizace cs/en přes `L(...)` a `Localizations/`. Komentáře jako krátké věty.
-- **Ověření:** `./build.sh` (build + self-testy) musí projít. Nová logika dostane self-test spouštěný z `build.sh` (vzor `--folder-transfer-self-test`).
+- **Ověření:** `./build.sh` (build + self-testy) musí projít. Nová logika dostane test v `Sources/ScreenshotNoteTestHost/` spouštěný z `build.sh` přes testovací host (vzor `--folder-transfer-self-test`); do appky test kód nepatří (`tests/test-inventory.py`).
 - **Review na konci fáze**, až když je build zelený a změny commitnuté:
   1. Jeden subagent (`Agent`, typ `general-purpose`). Dej mu jen rozsah (`git diff <base>...HEAD`), cíl fáze a odkaz na `docs/PROTOCOL.md`. Svůj závěr mu nedávej. Ať hledá chyby správnosti, bezpečnosti (socket, oprávnění souborů, redakce) a regrese v ukládání a znovuotevírání session.
   2. Souběžně Codex přes Bash na pozadí: `codex review --base <base>`. S `--base` Codex nepřijme vlastní prompt, cíl fáze mu proto nedávej.
@@ -77,7 +77,7 @@ Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F
 
 Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (nová větev feat/browser-context-p2 z p1 nebo z main, pokud je p1 mergnutá), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
 
-Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F2), docs/PROTOCOL.md (sekce Bundle a Uložení), docs/PLAN.md. V Mac repu: BrowserBridge.swift z F1, CaptureNote.swift (Draft), v main.swift funkci snímání (grep -n screencapture) a export, Templates.swift, SessionIndex.swift a PreviousSessions.swift (jen části o assets, obrázcích a hashích).
+Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F2), docs/PROTOCOL.md (sekce Bundle a Uložení), docs/PLAN.md. V Mac repu: `Sources/ScreenshotNoteKit/BrowserBridge/BrowserBridge.swift` z F1, `Notes/CaptureNote.swift` (Draft), v `App/AppDelegate.swift` funkci snímání (grep -n screencapture) a export, Templates.swift, SessionIndex.swift a PreviousSessions.swift (jen části o assets, obrázcích a hashích).
 
 Pravidla: bez subagentů, jen review na konci. Šetři kontext.
 
@@ -139,7 +139,7 @@ Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F
 
 Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p4), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
 
-Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F4), docs/PROTOCOL.md (Mapování elementů). V Mac repu: funkci snímání v main.swift (grep -n screencapture) a uložení kontextu z F2.
+Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F4), docs/PROTOCOL.md (Mapování elementů). V Mac repu: funkci snímání v `Sources/ScreenshotNoteKit/App/AppDelegate.swift` (grep -n screencapture) a uložení kontextu z F2.
 
 Problém: `screencapture -i` neřekne, jaký výřez uživatel vybral.
 
@@ -172,7 +172,7 @@ Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F
 
 Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p5), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
 
-Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F5), docs/PROTOCOL.md (Mapování, anotace). V Mac repu: Annotations.swift a AnnotationGeometry.swift celé (jsou malé), přepočet elementů z F4, export poznámek pod obrázkem.
+Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F5), docs/PROTOCOL.md (Mapování, anotace). V Mac repu: `Sources/ScreenshotNoteKit/Annotations/Annotations.swift` a `AnnotationGeometry.swift` celé (jsou malé), přepočet elementů z F4, export poznámek pod obrázkem.
 
 Pravidla: bez subagentů, jen review na konci. Šetři kontext.
 

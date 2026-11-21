@@ -36,8 +36,8 @@ class FakeArea {
       this.onChanged?.fire({ [key]: { oldValue, newValue: structuredClone(value) } }, this.name);
     }
   }
-  async remove(key: string): Promise<void> {
-    delete this.data[key];
+  async remove(keys: string | string[]): Promise<void> {
+    for (const key of Array.isArray(keys) ? keys : [keys]) delete this.data[key];
   }
   async clear(): Promise<void> {
     this.data = {};
@@ -64,6 +64,7 @@ export interface FakeWindow {
 
 export interface FakeChromeOptions {
   settings?: Record<string, unknown>;
+  session?: Record<string, unknown>;
   windows?: FakeWindow[];
   // Odpověď content scriptu na collect, podle ID záložky.
   collect?: (tabId: number) => unknown;
@@ -74,6 +75,7 @@ export function installFakeChrome(options: FakeChromeOptions = {}) {
   const local = new FakeArea(onChanged, 'local');
   const session = new FakeArea();
   if (options.settings) local.data.settings = options.settings;
+  if (options.session) session.data = structuredClone(options.session);
   const windows = options.windows ?? [
     { id: 1, focused: true, left: 0, top: 0, width: 1200, height: 800, tabs: [{ id: 1, windowId: 1, active: true, url: 'https://app.example.com/', title: 'App' }] },
   ];

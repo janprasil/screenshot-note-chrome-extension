@@ -9,8 +9,12 @@
   přežije restart workeru, ale ne restart prohlížeče. Na disk se nic nepíše.
 - Buffer je omezený časem (výchozí 5 min) a počtem: 2000 záznamů stránky, 500
   requestů na záložku. Zavřením záložky se smaže.
-- Těla odpovědí se nahrávají jen při zapnutém přepínači v popupu, pouze textové
-  typy, nejvýš 256 KiB na odpověď.
+- Těla requestů i odpovědí se nahrávají jen při zapnutém přepínači v popupu.
+  Bez něj si rozšíření těla od webRequest ani nevyžádá a content script je
+  zahodí. Odpovědi jen textových typů, nejvýš 256 KiB na odpověď.
+- webRequest zachytí requesty všech rámců záložky, tedy i iframů jiných domén
+  (např. platebních widgetů).
+- Vypnutím přepínače těl se okamžitě smažou všechna uložená těla.
 - Vypnutím nahrávání se okamžitě smažou všechny buffery.
 
 ## Redakce

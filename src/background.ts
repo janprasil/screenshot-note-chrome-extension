@@ -12,7 +12,8 @@ const MAX_REQUEST_BODY = 64 * 1024;
 const MAX_BUNDLE_BYTES = 32 * 1024 * 1024;
 const extensionVersion = chrome.runtime.getManifest().version;
 
-let settings: RecorderSettings = DEFAULT_SETTINGS;
+// Do načtení nastavení se nic nenahrává, uživatel mohl nahrávání vypnout.
+let settings: RecorderSettings = { ...DEFAULT_SETTINGS, enabled: false };
 const tabs = new Map<number, { buffer: RingBuffer<Stored>; byId: Map<string, Stored> }>();
 const dirty = new Set<number>();
 let flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -22,6 +23,7 @@ let flushTimer: ReturnType<typeof setTimeout> | undefined;
 const ready = (async () => {
   const { settings: stored } = await chrome.storage.local.get('settings');
   settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+  registerBodyListener();
   const saved = await chrome.storage.session.get(null);
   for (const [key, value] of Object.entries(saved)) {
     if (!key.startsWith('net:')) continue;
@@ -29,12 +31,15 @@ const ready = (async () => {
     state.buffer.replace(value as Stored[]);
     for (const entry of state.buffer.toArray()) state.byId.set(entry.requestId, entry);
   }
+  if (!settings.recordBodies) clearBodies();
 })();
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes.settings) return;
   settings = { ...DEFAULT_SETTINGS, ...(changes.settings.newValue ?? {}) };
   for (const state of tabs.values()) state.buffer.setMaxAge(settings.bufferMs);
+  registerBodyListener();
+  if (!settings.recordBodies) clearBodies();
   if (!settings.enabled) {
     tabs.clear();
     void chrome.storage.session.clear();
@@ -56,7 +61,7 @@ function markDirty(tabId: number): void {
 }
 
 // Session storage is memory-only, it survives service worker restarts but not browser restarts.
-async function flush(): Promise<void> {
+async function flush(): Promise<boolean> {
   flushTimer = undefined;
   const items: Record<string, Stored[]> = {};
   for (const tabId of dirty) {
@@ -69,8 +74,10 @@ async function flush(): Promise<void> {
   dirty.clear();
   try {
     await chrome.storage.session.set(items);
+    return true;
   } catch {
     // Quota exceeded, the in-memory buffer still works.
+    return false;
   }
 }
 
@@ -88,6 +95,8 @@ function entryFor(details: { tabId: number; requestId: string }): Stored | undef
   return tabs.get(details.tabId)?.byId.get(details.requestId);
 }
 
+const pendingBodies = new Map<string, string>();
+
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
     if (!settings.enabled || details.tabId < 0) return;
@@ -101,15 +110,57 @@ chrome.webRequest.onBeforeRequest.addListener(
       initiator: details.initiator,
       startTime: details.timeStamp,
       time: details.timeStamp,
-      requestBody: requestBodyText(details.requestBody),
     };
+    const body = pendingBodies.get(details.requestId);
+    pendingBodies.delete(details.requestId);
+    if (body !== undefined && settings.recordBodies) entry.requestBody = body;
     state.buffer.push(entry);
     state.byId.set(entry.requestId, entry);
     markDirty(details.tabId);
   },
   filter,
-  ['requestBody'],
 );
+
+// Těla si od Chromu bere samostatný listener, registrovaný jen při zapnutém nahrávání těl.
+function onRequestBody(details: chrome.webRequest.WebRequestBodyDetails): void {
+  if (!settings.enabled || !settings.recordBodies || details.tabId < 0) return;
+  const body = requestBodyText(details.requestBody);
+  if (body === undefined) return;
+  const entry = tabs.get(details.tabId)?.byId.get(details.requestId);
+  if (entry) {
+    entry.requestBody = body;
+    markDirty(details.tabId);
+    return;
+  }
+  // Pořadí listenerů není zaručené, hlavní listener si tělo vyzvedne.
+  pendingBodies.set(details.requestId, body);
+  if (pendingBodies.size > 100) pendingBodies.delete(pendingBodies.keys().next().value!);
+}
+
+function registerBodyListener(): void {
+  const listening = chrome.webRequest.onBeforeRequest.hasListener(onRequestBody);
+  if (settings.recordBodies && !listening) chrome.webRequest.onBeforeRequest.addListener(onRequestBody, filter, ['requestBody']);
+  if (!settings.recordBodies && listening) chrome.webRequest.onBeforeRequest.removeListener(onRequestBody);
+}
+
+function clearBodies(): void {
+  pendingBodies.clear();
+  let found = false;
+  for (const [tabId, state] of tabs) {
+    for (const entry of state.buffer.toArray()) {
+      if (entry.requestBody === undefined) continue;
+      delete entry.requestBody;
+      dirty.add(tabId);
+      found = true;
+    }
+  }
+  if (!found) return;
+  // Uložená těla přepíšeme hned, při chybě smažeme celé záznamy v session.
+  if (flushTimer) clearTimeout(flushTimer);
+  void flush().then((ok) => {
+    if (!ok) void chrome.storage.session.remove([...tabs.keys()].map((tabId) => `net:${tabId}`));
+  });
+}
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {

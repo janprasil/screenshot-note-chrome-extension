@@ -27,7 +27,7 @@ document.addEventListener(ENTRY_EVENT, (event) => {
   if (!settings.enabled) return;
   try {
     const entry = JSON.parse(String((event as CustomEvent).detail)) as PageEntry;
-    if (entry && typeof entry.time === 'number') buffer.push(entry);
+    if (entry && typeof entry.time === 'number') buffer.push(settings.recordBodies ? entry : withoutBodies(entry));
   } catch {
     // The page can dispatch this event too, ignore garbage.
   }
@@ -37,7 +37,15 @@ function applySettings(next: RecorderSettings): void {
   settings = { ...DEFAULT_SETTINGS, ...next };
   buffer.setMaxAge(settings.bufferMs);
   if (!settings.enabled) buffer.clear();
+  if (!settings.recordBodies) buffer.replace(buffer.toArray().map(withoutBodies));
   document.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: JSON.stringify(settings) }));
+}
+
+// Bez zapnutého nahrávání těl se těla requestů neukládají.
+function withoutBodies(entry: PageEntry): PageEntry {
+  if (entry.kind !== 'request') return entry;
+  const { requestBody: _request, responseBody: _response, truncated: _truncated, ...rest } = entry;
+  return rest;
 }
 
 chrome.storage.local.get('settings').then(({ settings: stored }) => applySettings(stored ?? DEFAULT_SETTINGS));

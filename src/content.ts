@@ -1,6 +1,7 @@
 // Isolated-world content script: buffers page events and answers collect requests.
 import { DEFAULT_SETTINGS } from './lib/defaults.ts';
 import { collectElements, pageGeometry } from './lib/elements.ts';
+import { MAX_BUFFER_CHARS, entrySize, sanitizePageEntry } from './lib/page-entry.ts';
 import { RingBuffer } from './lib/ring-buffer.ts';
 import type { PageEntry, PageInfo, RecorderSettings } from './lib/types.ts';
 
@@ -20,14 +21,19 @@ export interface CollectResponse {
   elements?: ReturnType<typeof collectElements>;
 }
 
-const buffer = new RingBuffer<PageEntry>(2_000, DEFAULT_SETTINGS.bufferMs);
+// Strop jedné události ještě před parsováním JSONu.
+const MAX_EVENT_CHARS = 4 * 1024 * 1024;
+
+const buffer = new RingBuffer<PageEntry>(2_000, DEFAULT_SETTINGS.bufferMs, MAX_BUFFER_CHARS, entrySize);
 let settings: RecorderSettings = DEFAULT_SETTINGS;
 
 document.addEventListener(ENTRY_EVENT, (event) => {
   if (!settings.enabled) return;
   try {
-    const entry = JSON.parse(String((event as CustomEvent).detail)) as PageEntry;
-    if (entry && typeof entry.time === 'number') buffer.push(settings.recordBodies ? entry : withoutBodies(entry));
+    const detail = (event as CustomEvent).detail;
+    if (typeof detail !== 'string' || detail.length > MAX_EVENT_CHARS) return;
+    const entry = sanitizePageEntry(JSON.parse(detail));
+    if (entry) buffer.push(settings.recordBodies ? entry : withoutBodies(entry));
   } catch {
     // The page can dispatch this event too, ignore garbage.
   }
@@ -53,6 +59,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.settings) applySettings(changes.settings.newValue ?? DEFAULT_SETTINGS);
 });
 
+// DOM patří stránce, chyba v mapě elementů nesmí shodit celý collect.
+function safeElements(includeText: boolean): ReturnType<typeof collectElements> | undefined {
+  try {
+    return collectElements(includeText);
+  } catch {
+    return undefined;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: CollectRequest, _sender, respond) => {
   if (message?.type !== 'collect' || window.top !== window) return false;
   buffer.prune();
@@ -65,7 +80,7 @@ chrome.runtime.onMessage.addListener((message: CollectRequest, _sender, respond)
       geometry: pageGeometry(),
     },
     entries: buffer.since(message.since),
-    elements: message.includeElements ? collectElements(message.includeElementText) : undefined,
+    elements: message.includeElements ? safeElements(message.includeElementText) : undefined,
   };
   respond(response);
   return false;

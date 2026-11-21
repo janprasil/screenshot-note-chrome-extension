@@ -160,16 +160,20 @@ function absoluteUrl(url: string): string {
 }
 
 function bodyText(body: unknown): string | undefined {
-  // Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
-  if (typeof body === 'string') return body.length > MAX_BODY ? BODY_TRUNCATED : body;
-  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body === 'string') return capped(body);
+  if (body instanceof URLSearchParams) return capped(body.toString());
   if (body instanceof FormData) {
     const fields: string[] = [];
     body.forEach((value, key) => fields.push(`${encodeURIComponent(key)}=${typeof value === 'string' ? encodeURIComponent(value) : '[file]'}`));
-    return fields.join('&');
+    return capped(fields.join('&'));
   }
   if (body === undefined || body === null) return undefined;
   return '[binary body]';
+}
+
+// Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
+function capped(text: string): string {
+  return text.length > MAX_BODY ? BODY_TRUNCATED : text;
 }
 
 function limit(text: string): { responseBody: string; truncated?: boolean } {

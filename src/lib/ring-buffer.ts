@@ -1,24 +1,34 @@
-/** Bounded buffer that drops entries by count and by age. */
+/** Bounded buffer that drops entries by count, by age and optionally by total size. */
 export class RingBuffer<T extends { time: number }> {
   private items: T[] = [];
+  private sizes: number[] = [];
+  private total = 0;
   private maxItems: number;
   private maxAgeMs: number;
+  private maxSize: number;
+  private sizeOf: (item: T) => number;
 
-  constructor(maxItems: number, maxAgeMs: number) {
+  constructor(maxItems: number, maxAgeMs: number, maxSize = Infinity, sizeOf: (item: T) => number = () => 0) {
     this.maxItems = maxItems;
     this.maxAgeMs = maxAgeMs;
+    this.maxSize = maxSize;
+    this.sizeOf = sizeOf;
   }
 
   push(item: T): void {
+    const size = this.sizeOf(item);
+    // Záznam větší než celý limit se nepřijme.
+    if (size > this.maxSize) return;
     this.items.push(item);
-    if (this.items.length > this.maxItems) this.items.splice(0, this.items.length - this.maxItems);
+    this.sizes.push(size);
+    this.total += size;
+    this.trim();
   }
 
   prune(now = Date.now()): void {
     const cutoff = now - this.maxAgeMs;
     const index = this.items.findIndex((item) => item.time >= cutoff);
-    if (index === -1) this.items = [];
-    else if (index > 0) this.items.splice(0, index);
+    this.drop(index === -1 ? this.items.length : index);
   }
 
   since(time: number): T[] {
@@ -30,7 +40,11 @@ export class RingBuffer<T extends { time: number }> {
   }
 
   replace(items: T[]): void {
-    this.items = items.slice(-this.maxItems);
+    const sized = items.slice(-this.maxItems).map((item) => ({ item, size: this.sizeOf(item) })).filter(({ size }) => size <= this.maxSize);
+    this.items = sized.map(({ item }) => item);
+    this.sizes = sized.map(({ size }) => size);
+    this.total = this.sizes.reduce((sum, size) => sum + size, 0);
+    this.trim();
   }
 
   setMaxAge(ms: number): void {
@@ -39,9 +53,25 @@ export class RingBuffer<T extends { time: number }> {
 
   clear(): void {
     this.items = [];
+    this.sizes = [];
+    this.total = 0;
   }
 
   get size(): number {
     return this.items.length;
+  }
+
+  private trim(): void {
+    let count = Math.max(0, this.items.length - this.maxItems);
+    let total = this.total;
+    for (let index = 0; index < count; index++) total -= this.sizes[index];
+    while (total > this.maxSize && count < this.items.length) total -= this.sizes[count++];
+    this.drop(count);
+  }
+
+  private drop(count: number): void {
+    if (count <= 0) return;
+    this.items.splice(0, count);
+    for (const size of this.sizes.splice(0, count)) this.total -= size;
   }
 }

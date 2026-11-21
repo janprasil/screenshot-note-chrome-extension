@@ -19,13 +19,29 @@ export function buildHar(input: HarInput): unknown {
   const used = new Set<PageRequestEntry>();
   const sorted = input.network.slice().sort((a, b) => a.startTime - b.startTime);
 
-  const entries: { startedDateTime: string }[] = sorted.map((entry) => {
+  // Vadný záznam se přeskočí, nesmí shodit celý HAR.
+  const entries: { startedDateTime: string }[] = [];
+  for (const entry of sorted) {
     const page = matchPageRequest(entry, input.pageRequests, used);
-    return toHarEntry(entry, page, pageId, policy);
-  });
-
+    try {
+      entries.push(toHarEntry(entry, page, pageId, policy));
+    } catch {
+      // Vadný záznam stránky nesmí shodit záznam webRequest.
+      if (page) used.delete(page);
+      try {
+        entries.push(toHarEntry(entry, undefined, pageId, policy));
+      } catch {
+        // Přeskočit.
+      }
+    }
+  }
   for (const page of input.pageRequests) {
-    if (!used.has(page)) entries.push(pageOnlyEntry(page, pageId, policy));
+    if (used.has(page)) continue;
+    try {
+      entries.push(pageOnlyEntry(page, pageId, policy));
+    } catch {
+      // Přeskočit.
+    }
   }
   entries.sort((a, b) => a.startedDateTime.localeCompare(b.startedDateTime));
 
@@ -53,7 +69,8 @@ function matchPageRequest(entry: NetworkEntry, pages: PageRequestEntry[], used: 
   let best: PageRequestEntry | undefined;
   let bestDelta = Infinity;
   for (const page of pages) {
-    if (used.has(page) || page.method.toUpperCase() !== entry.method.toUpperCase()) continue;
+    if (used.has(page) || typeof page.method !== 'string' || typeof page.url !== 'string' || !Number.isFinite(page.time)) continue;
+    if (page.method.toUpperCase() !== entry.method.toUpperCase()) continue;
     if (!sameUrl(page.url, entry.url)) continue;
     const delta = Math.abs(page.time - entry.startTime);
     if (delta < MATCH_WINDOW_MS && delta < bestDelta) {

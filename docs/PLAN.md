@@ -27,5 +27,5 @@ network (HAR) a mapu elementů. Element se pak dá vybrat a popsat v anotaci.
 
 - Content script běží jen v hlavním rámci, iframy se nesbírají.
 - Requesty obsloužené service workerem stránky nemají webRequest hlavičky. Jsou v HARu jen ze záznamu stránky (`_source: "page"`).
-- Událost `screenshot-note:entry` může vyvolat i stránka sama. Podvrhnout tak může jen vlastní záznamy, k jiným datům se nedostane.
+- Událost `screenshot-note:entry` může vyvolat i stránka sama. Podvrhnout tak může jen vlastní záznamy, k jiným datům se nedostane. Záznamy se ověřují a omezují velikostí, takže capture nezablokuje ani nenafoukne.
 - Konzole zaznamenaná před načtením content scriptu (velmi raný inline skript) se může ztratit.

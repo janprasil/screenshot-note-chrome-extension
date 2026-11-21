@@ -7,8 +7,13 @@
 - webRequest záznamy (URL, hlavičky včetně cookies, statusy, časy) jsou v paměti
   service workeru a v `chrome.storage.session`. To je paměťové úložiště, které
   přežije restart workeru, ale ne restart prohlížeče. Na disk se nic nepíše.
-- Buffer je omezený časem (výchozí 5 min) a počtem: 2000 záznamů stránky, 500
-  requestů na záložku. Zavřením záložky se smaže.
+- Buffer je omezený časem (výchozí 5 min), počtem (2000 záznamů stránky, 500
+  requestů na záložku) a velikostí (záznamy stránky nejvýš 8 Mi znaků JSONu).
+  Zavřením záložky se smaže.
+- Záznamy ze stránky se ověřují: neznámé typy a špatné typy polí se zahodí, čas
+  se omezí na „teď“, texty se zkrátí (argument konzole 4000 znaků, nejvýš 50
+  argumentů, zpráva a stack 16 000 znaků, URL 8000 znaků, tělo 256 KiB). Událost
+  delší než 4 Mi znaků se zahodí celá.
 - Těla requestů i odpovědí se nahrávají jen při zapnutém přepínači v popupu.
   Bez něj si rozšíření těla od webRequest ani nevyžádá a content script je
   zahodí. Odpovědi jen textových typů, nejvýš 256 KiB na odpověď.

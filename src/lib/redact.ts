@@ -3,6 +3,9 @@ import type { CapturePolicy, Header } from './types.ts';
 
 export const REDACTED = '[redacted]';
 
+// Hlavičky, jejichž hodnota je URL.
+const URL_HEADERS = ['location', 'referer', 'origin', 'content-location'];
+
 /** Keeps cookie names and replaces their values. */
 export function redactCookieHeader(value: string): string {
   return value
@@ -34,6 +37,8 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     }
     if (policy.redactAuthHeaders && AUTH_HEADERS.includes(lower)) return { name, value: redactAuthValue(value) };
     if (custom.has(lower)) return { name, value: REDACTED };
+    if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
+    if (lower === 'refresh') return { name, value: value.replace(/(url\s*=\s*)(\S+)/i, (_match, prefix: string, url: string) => prefix + redactUrl(url, policy)) };
     return { name, value };
   });
 }
@@ -44,27 +49,77 @@ function redactAuthValue(value: string): string {
   return match ? `${match[1]} ${REDACTED}` : REDACTED;
 }
 
+/** Redaguje přihlašovací údaje a citlivé parametry v query i ve fragmentu, funguje i pro relativní URL. */
 export function redactUrl(url: string, policy: CapturePolicy): string {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return url;
+  if (typeof url !== 'string') return '';
+  const names = new Set(policy.redactQueryParams.map((name) => name.toLowerCase()));
+  const sensitive = (name: string) => names.has(name.toLowerCase());
+  let base = url;
+  let query: string | undefined;
+  let fragment: string | undefined;
+  const hashIndex = base.indexOf('#');
+  if (hashIndex !== -1) {
+    fragment = base.slice(hashIndex + 1);
+    base = base.slice(0, hashIndex);
   }
-  if (parsed.username || parsed.password) {
+  const queryIndex = base.indexOf('?');
+  if (queryIndex !== -1) {
+    query = base.slice(queryIndex + 1);
+    base = base.slice(0, queryIndex);
+  }
+  let output = redactUserInfo(base);
+  if (query !== undefined) output += `?${redactParams(query, sensitive)}`;
+  if (fragment !== undefined) output += `#${redactFragment(fragment, sensitive)}`;
+  return output;
+}
+
+function redactUserInfo(base: string): string {
+  if (!base.includes('@')) return base;
+  // Protokolově relativní URL (`//u:p@host`) parsujeme s dočasným schématem.
+  const relative = base.startsWith('//');
+  try {
+    const parsed = new URL(relative ? `http:${base}` : base);
+    if (!parsed.username && !parsed.password) return base;
     parsed.username = parsed.username ? REDACTED : '';
     parsed.password = parsed.password ? REDACTED : '';
+    return relative ? parsed.href.slice('http:'.length) : parsed.href;
+  } catch {
+    return base;
   }
-  const names = new Set(policy.redactQueryParams.map((name) => name.toLowerCase()));
-  let changed = false;
-  for (const key of [...parsed.searchParams.keys()]) {
-    if (names.has(key.toLowerCase())) {
-      parsed.searchParams.set(key, REDACTED);
-      changed = true;
-    }
+}
+
+/** Nahradí hodnoty citlivých parametrů a ostatní nechá beze změny. */
+function redactParams(params: string, sensitive: (name: string) => boolean): string {
+  return params
+    .split(/([&#])/)
+    .map((part, position) => {
+      if (position % 2 === 1) return part;
+      const index = part.indexOf('=');
+      if (index <= 0) return part;
+      return sensitive(decodeName(part.slice(0, index))) ? `${part.slice(0, index + 1)}${encodeURIComponent(REDACTED)}` : part;
+    })
+    .join('');
+}
+
+// Fragment bývá `a=1&b=2` (implicit flow) nebo `/route?a=1` (SPA).
+function redactFragment(fragment: string, sensitive: (name: string) => boolean): string {
+  const index = fragment.indexOf('?');
+  if (index !== -1) return `${fragment.slice(0, index + 1)}${redactParams(fragment.slice(index + 1), sensitive)}`;
+  return fragment.includes('=') ? redactParams(fragment, sensitive) : fragment;
+}
+
+function decodeName(name: string): string {
+  try {
+    return decodeURIComponent(name.replace(/\+/g, ' ')).replace(/[\t\n\r]/g, '');
+  } catch {
+    return name.replace(/[\t\n\r]/g, '');
   }
-  if (!changed && !parsed.username && !parsed.password) return url;
-  return parsed.toString();
+}
+
+/** Redaguje všechny absolutní URL nalezené ve volném textu, např. ve stack trace. */
+export function redactUrlsInText(text: string, policy: CapturePolicy): string {
+  if (typeof text !== 'string') return text;
+  return text.replace(/\b[a-z][\w+.-]*:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
 }
 
 /** Redacts sensitive JSON keys or form fields and truncates the result. */

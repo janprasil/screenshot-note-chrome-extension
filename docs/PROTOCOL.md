@@ -81,7 +81,7 @@ Policy může redakci jen přidat, nikdy ubrat:
 | `redactCookies` | `true` | vždy zapnuto; jména cookies zůstanou, hodnoty se skryjí |
 | `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF…; schéma (`Bearer`) zůstane |
 | `redactHeaders` | `[]` | vlastní hlavičky ke skrytí, přidají se |
-| `redactQueryParams` | token, code, key… | přidají se k výchozím |
+| `redactQueryParams` | token, code, key… | přidají se k výchozím; platí i pro fragment URL a hlavičky `Location`, `Referer`, `Origin`, `Content-Location` |
 | `redactBodyKeys` | password, token… | JSON a form-urlencoded, přidají se k výchozím |
 | `maxBodyBytes` | 64 KiB | |
 | `windowMs` | 2 min | jak daleko do minulosti |

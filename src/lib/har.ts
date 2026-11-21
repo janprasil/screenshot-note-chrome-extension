@@ -111,6 +111,7 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
         mimeType,
         ...(responseBody.text !== undefined ? { text: responseBody.text } : {}),
       },
+      // Hlavičky už prošly redakcí včetně Location.
       redirectURL: headerValue(responseHeaders, 'location') ?? '',
       headersSize: -1,
       bodySize: -1,

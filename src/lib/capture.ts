@@ -1,6 +1,6 @@
 import { buildHar } from './har.ts';
 import { summarize } from './summary.ts';
-import { redactUrl } from './redact.ts';
+import { redactUrl, redactUrlsInText } from './redact.ts';
 import type {
   CaptureBundle,
   CapturePolicy,
@@ -58,6 +58,10 @@ export function buildBundle(input: BundleInput): CaptureBundle {
 
 function redactLogUrls<T extends ConsoleEntry | ErrorEntry>(entry: T, policy: CapturePolicy): T {
   const copy = { ...entry, url: redactUrl(entry.url, policy) };
-  if (copy.kind === 'error' && copy.source) copy.source = redactUrl(copy.source, policy);
+  if (copy.stack) copy.stack = redactUrlsInText(copy.stack, policy);
+  if (copy.kind === 'error') {
+    if (copy.source) copy.source = redactUrl(copy.source, policy);
+    copy.message = redactUrlsInText(copy.message, policy);
+  }
   return copy;
 }

@@ -30,6 +30,9 @@ záložku, jinou záložku si host vyžádat nemůže.
 - [x] Skrýt autorizační hlavičky (`Authorization`, `X-Api-Key`, CSRF…). Vždy.
 - [ ] Vlastní hlavičky ke skrytí (seznam).
 - [x] Skrýt citlivé query parametry (token, code, key…). Výchozí seznam vždy.
+  Stejně se redigují parametry ve fragmentu URL (`#access_token=…`, `#/cesta?token=…`)
+  a URL v hlavičkách `Location`, `Referer`, `Origin`, `Content-Location`, `Refresh`
+  i v `redirectURL`. URL ve stack trace a ve zprávách chyb se redigují také.
 - [ ] Přiložit těla requestů a odpovědí (klíče `password`, `token`… se skryjí).
 - [x] Přiložit mapu elementů. [x] Včetně textů prvků.
 

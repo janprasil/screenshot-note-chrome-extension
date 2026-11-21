@@ -66,6 +66,7 @@ Host → rozšíření:
 - Bez shody se použije naposledy fokusované okno.
 
 `policy` (`CapturePolicy`) nastavuje Mac appka podle složky nebo konfigurace. Chybějící pole doplní výchozí hodnoty (`src/lib/defaults.ts`).
+Mac appka posílá `includeConsole`, `includeNetwork`, `includeBodies`, `includeElements`, `includeElementText`, `redactCookies`/`redactAuthHeaders` (vždy `true`), `redactHeaders` a `redactQueryParams` z nastavení lokální složky. Složka s vypnutým kontextem a cloudová složka `capture.request` vůbec nepošlou.
 Policy může redakci jen přidat, nikdy ubrat:
 - `redactCookies` a `redactAuthHeaders` jsou vždy `true`, bez ohledu na hodnotu od hostu.
 - Seznamy `redactHeaders`, `redactQueryParams` a `redactBodyKeys` od hostu se přidají k výchozím.
@@ -147,6 +148,8 @@ assets/
 - Název v `assets/` musí být volný pro `.png`, `.context.json` i `.har` (kolize jako u PNG: `Název-1 2`).
   Index relace nese hashe všech tří souborů. Znovuotevření najde kontext podle názvu obrázku.
 - Cloudové složky kontext zatím zahodí (upload je F6).
+- Kontext se exportuje jen do složky, která ho má podle aktuálního nastavení zapnutý.
+- „Odebrat kontext“ v komposeru smaže soubory v draftu; u znovuotevřené relace si draft pamatuje původní název (`Draft.removedContexts`) a `assets/<název>.context.json` a `.har` se smažou až po zápisu Markdownu.
 - Do Markdownu jde nový placeholder `{context}` (souhrn: řádek `- Screenshot N: …` za snímek
   s kontextem). Výchozí šablona ho nemá. Obrázek v `{screenshots}` dostane pod poznámkou
   sbalitelný callout (texty ze stránky jen v inline kódu, bez backticků a zalomení):

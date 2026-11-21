@@ -113,7 +113,7 @@ Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F3
 Pravidla: bez subagentů, jen review na konci. Šetři kontext.
 
 Úkol:
-1. Do konfigurace lokální složky přidej politiku kontextu podle PRIVACY.md: přikládat konzoli, network, mapu elementů, texty prvků, těla; skrývat cookies, autorizační hlavičky, vlastní hlavičky (seznam), citlivé query parametry. Výchozí hodnoty jako DEFAULT_POLICY. Codable, zpětně kompatibilní.
+1. Do konfigurace lokální složky přidej politiku kontextu podle PRIVACY.md: přikládat konzoli, network, mapu elementů, texty prvků, těla; vlastní hlavičky (seznam), další citlivé query parametry. Skrývání cookies a autorizačních hlaviček je v rozšíření vždy zapnuté, v UI ho ukaž jako zamčené. Výchozí hodnoty jako DEFAULT_POLICY. Codable, zpětně kompatibilní.
 2. Cloudové složky: kontext vypnutý a přepínač zatím neaktivní s vysvětlením „připravujeme“. Upload je F6.
 3. capture.request posílá politiku vybrané konfigurace.
 4. Komposer: na náhledu obrázku malý odznak, že má kontext (počet chyb a selhaných requestů ze summary). Akce „Odebrat kontext“ u obrázku.

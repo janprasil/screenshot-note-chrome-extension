@@ -1,8 +1,13 @@
 /** Bounded buffer that drops entries by count and by age. */
 export class RingBuffer<T extends { time: number }> {
   private items: T[] = [];
+  private maxItems: number;
+  private maxAgeMs: number;
 
-  constructor(private maxItems: number, private maxAgeMs: number) {}
+  constructor(maxItems: number, maxAgeMs: number) {
+    this.maxItems = maxItems;
+    this.maxAgeMs = maxAgeMs;
+  }
 
   push(item: T): void {
     this.items.push(item);

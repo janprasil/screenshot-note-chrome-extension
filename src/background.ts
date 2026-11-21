@@ -186,10 +186,17 @@ export interface CaptureTarget {
   tabId?: number;
 }
 
-async function findTab(target: CaptureTarget | undefined): Promise<chrome.tabs.Tab | undefined> {
-  if (target?.tabId !== undefined) return chrome.tabs.get(target.tabId).catch(() => undefined);
+async function findTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
+  let target = parseTarget(input);
   const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal', 'popup', 'app'] });
   const activeTab = (window: chrome.windows.Window) => window.tabs?.find((tab) => tab.active);
+
+  // Přímé tabId platí jen pro aktivní záložku některého okna, jinak se cíl ignoruje.
+  if (target?.tabId !== undefined) {
+    const tab = windows.map(activeTab).find((candidate) => candidate?.id === target?.tabId);
+    if (tab) return tab;
+    target = undefined;
+  }
 
   if (target?.windowBounds) {
     const bounds = target.windowBounds;
@@ -214,10 +221,27 @@ async function findTab(target: CaptureTarget | undefined): Promise<chrome.tabs.T
   return focused ? activeTab(focused) : undefined;
 }
 
-async function capture(policyInput: Partial<CapturePolicy> | undefined, target?: CaptureTarget): Promise<CaptureBundle> {
+function parseTarget(input: unknown): CaptureTarget | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const raw = input as Record<string, unknown>;
+  const target: CaptureTarget = {};
+  const bounds = raw.windowBounds as Record<string, unknown> | undefined;
+  if (bounds && typeof bounds === 'object' && ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(bounds[key]))) {
+    target.windowBounds = { x: bounds.x as number, y: bounds.y as number, width: bounds.width as number, height: bounds.height as number };
+  }
+  if (typeof raw.windowTitle === 'string') target.windowTitle = raw.windowTitle;
+  if (raw.tabId !== undefined) {
+    // Neplatné tabId zahodí celý cíl, stejně jako neaktivní záložka.
+    if (!Number.isInteger(raw.tabId)) return undefined;
+    target.tabId = raw.tabId as number;
+  }
+  return target;
+}
+
+async function capture(policyInput: unknown, target?: unknown): Promise<CaptureBundle> {
   await ready;
   if (!settings.enabled) throw new CaptureError('disabled', 'Recording is turned off in the extension.');
-  const policy = normalizePolicy(policyInput);
+  const policy = normalizePolicy(policyInput, settings);
   const tab = await findTab(target);
   if (tab?.id === undefined) throw new CaptureError('no-tab', 'No browser tab found.');
 
@@ -270,8 +294,10 @@ function fallbackGeometry(tab: chrome.tabs.Tab) {
 }
 
 class CaptureError extends Error {
-  constructor(public code: string, message: string) {
+  code: string;
+  constructor(code: string, message: string) {
     super(message);
+    this.code = code;
   }
 }
 
@@ -316,6 +342,7 @@ function scheduleReconnect(): void {
 }
 
 async function handleHost(message: HostMessage): Promise<void> {
+  if (!message || typeof message !== 'object') return;
   connected = true;
   lastError = undefined;
   retryDelay = 5_000;

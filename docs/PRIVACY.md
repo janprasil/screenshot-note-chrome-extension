@@ -15,14 +15,17 @@
 
 ## Redakce
 
-Redakce probíhá v rozšíření při exportu (`src/lib/redact.ts`). O tom, co se
-skryje, rozhoduje Mac appka přes `CapturePolicy`, tedy uživatel v nastavení
-složky nebo konfigurace:
+Redakce probíhá v rozšíření při exportu (`src/lib/redact.ts`). Mac appka přes
+`CapturePolicy` (nastavení složky nebo konfigurace) může redakci jen přidat.
+Výchozí redakci vypnout nemůže: cookies a autorizační hlavičky se skryjí vždy
+a výchozí seznamy hlaviček, query parametrů a klíčů těl platí vždy. Těla jdou
+ven jen při zapnutém přepínači v popupu. Přímé `tabId` platí jen pro aktivní
+záložku, jinou záložku si host vyžádat nemůže.
 
-- [x] Skrýt hodnoty cookies (`Cookie`, `Set-Cookie`), jména zůstanou.
-- [x] Skrýt autorizační hlavičky (`Authorization`, `X-Api-Key`, CSRF…).
+- [x] Skrýt hodnoty cookies (`Cookie`, `Set-Cookie`), jména zůstanou. Vždy.
+- [x] Skrýt autorizační hlavičky (`Authorization`, `X-Api-Key`, CSRF…). Vždy.
 - [ ] Vlastní hlavičky ke skrytí (seznam).
-- [x] Skrýt citlivé query parametry (token, code, key…).
+- [x] Skrýt citlivé query parametry (token, code, key…). Výchozí seznam vždy.
 - [ ] Přiložit těla requestů a odpovědí (klíče `password`, `token`… se skryjí).
 - [x] Přiložit mapu elementů. [x] Včetně textů prvků.
 

@@ -39,14 +39,40 @@ export const DEFAULT_POLICY: CapturePolicy = {
   windowMs: 2 * 60_000,
 };
 
-/** Fills missing fields so older or partial app requests stay valid. */
-export function normalizePolicy(input: Partial<CapturePolicy> | undefined): CapturePolicy {
-  const policy = { ...DEFAULT_POLICY, ...(input ?? {}) };
-  policy.windowMs = clamp(policy.windowMs, 1_000, 10 * 60_000);
-  policy.maxBodyBytes = clamp(policy.maxBodyBytes, 0, 1024 * 1024);
-  return policy;
+const MAX_LIST = 200;
+
+/**
+ * Policy od hostu smí redakci jen přidat, nikdy ubrat.
+ * Pole se špatným typem se ignorují, těla jdou ven jen při zapnutém nahrávání těl.
+ */
+export function normalizePolicy(input: unknown, settings: RecorderSettings): CapturePolicy {
+  const raw = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const flag = (name: keyof CapturePolicy) => (typeof raw[name] === 'boolean' ? (raw[name] as boolean) : (DEFAULT_POLICY[name] as boolean));
+  return {
+    includeConsole: flag('includeConsole'),
+    includeNetwork: flag('includeNetwork'),
+    includeBodies: settings.recordBodies === true && raw.includeBodies === true,
+    includeElements: flag('includeElements'),
+    includeElementText: flag('includeElementText'),
+    redactCookies: true,
+    redactAuthHeaders: true,
+    redactHeaders: mergeNames(DEFAULT_POLICY.redactHeaders, raw.redactHeaders),
+    redactQueryParams: mergeNames(DEFAULT_POLICY.redactQueryParams, raw.redactQueryParams),
+    redactBodyKeys: mergeNames(DEFAULT_POLICY.redactBodyKeys, raw.redactBodyKeys),
+    maxBodyBytes: clamp(raw.maxBodyBytes, DEFAULT_POLICY.maxBodyBytes, 0, 1024 * 1024),
+    windowMs: clamp(raw.windowMs, DEFAULT_POLICY.windowMs, 1_000, 10 * 60_000),
+  };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
+function mergeNames(defaults: string[], extra: unknown): string[] {
+  const names = [...defaults];
+  if (!Array.isArray(extra)) return names;
+  for (const name of extra.slice(0, MAX_LIST)) {
+    if (typeof name === 'string' && name.length > 0 && name.length <= 200 && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+function clamp(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }

@@ -62,21 +62,27 @@ Host → rozšíření:
 `target` (vše volitelné):
 - `windowBounds: {x, y, width, height}`: okno prohlížeče z `CGWindowListCopyWindowInfo` v bodech, počátek vlevo nahoře. Rozšíření ho porovná s `chrome.windows` s tolerancí 8 bodů.
 - `windowTitle`: záložní shoda podle titulku aktivní záložky.
-- `tabId`: přímé určení (rezerva).
+- `tabId`: přímé určení (rezerva). Platí jen pro aktivní záložku některého okna. Jinak se celý `target` ignoruje.
 - Bez shody se použije naposledy fokusované okno.
 
-`policy` (`CapturePolicy`) nastavuje Mac appka podle složky nebo konfigurace. Chybějící pole doplní výchozí hodnoty (`src/lib/defaults.ts`):
+`policy` (`CapturePolicy`) nastavuje Mac appka podle složky nebo konfigurace. Chybějící pole doplní výchozí hodnoty (`src/lib/defaults.ts`).
+Policy může redakci jen přidat, nikdy ubrat:
+- `redactCookies` a `redactAuthHeaders` jsou vždy `true`, bez ohledu na hodnotu od hostu.
+- Seznamy `redactHeaders`, `redactQueryParams` a `redactBodyKeys` od hostu se přidají k výchozím.
+- `includeBodies` platí, jen když má uživatel v popupu zapnuté nahrávání těl.
+- Pole se špatným typem se ignorují a použije se výchozí hodnota.
+- V bundle je v `policy` to, co se skutečně použilo.
 
 | pole | výchozí | |
 |---|---|---|
 | `includeConsole` / `includeNetwork` / `includeElements` | `true` | |
-| `includeBodies` | `false` | těla jen pokud je rozšíření nahrává |
+| `includeBodies` | `false` | jen při zapnutém přepínači těl v popupu |
 | `includeElementText` | `true` | texty prvků v mapě elementů |
-| `redactCookies` | `true` | jména cookies zůstanou, hodnoty se skryjí |
-| `redactAuthHeaders` | `true` | `Authorization`, `X-Api-Key`, CSRF…; schéma (`Bearer`) zůstane |
-| `redactHeaders` | `[]` | vlastní hlavičky ke skrytí |
-| `redactQueryParams` | token, code, key… | |
-| `redactBodyKeys` | password, token… | JSON a form-urlencoded |
+| `redactCookies` | `true` | vždy zapnuto; jména cookies zůstanou, hodnoty se skryjí |
+| `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF…; schéma (`Bearer`) zůstane |
+| `redactHeaders` | `[]` | vlastní hlavičky ke skrytí, přidají se |
+| `redactQueryParams` | token, code, key… | přidají se k výchozím |
+| `redactBodyKeys` | password, token… | JSON a form-urlencoded, přidají se k výchozím |
 | `maxBodyBytes` | 64 KiB | |
 | `windowMs` | 2 min | jak daleko do minulosti |
 

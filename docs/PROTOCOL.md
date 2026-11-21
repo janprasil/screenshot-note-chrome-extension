@@ -152,7 +152,7 @@ assets/
   sbalitelný callout (texty ze stránky jen v inline kódu, bez backticků a zalomení):
 
 ```markdown
-> [!bug]- Kontext: https://app.example.com/orders (2 chyby, 1 selhaný request)
+> [!bug]- Kontext: `https://app.example.com/orders` (2 chyby, 1 selhaný request)
 > - `POST /api/orders` → 500
 > - `TypeError: Cannot read properties of undefined (reading 'id')`
 > - [HAR](<assets/Bug_1.har>) · [konzole](<assets/Bug_1.context.json>)

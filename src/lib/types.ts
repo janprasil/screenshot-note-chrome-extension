@@ -138,6 +138,8 @@ export interface CaptureBundle {
   console: (ConsoleEntry | ErrorEntry)[];
   har?: unknown;
   elements?: ElementInfo[];
+  /** Jen u bundle zmenšeného kvůli velikosti: zda se zahodila těla a kolik záznamů. */
+  trimmed?: { bodies: boolean; network: number; console: number; elements: number };
 }
 
 export interface RecorderSettings {

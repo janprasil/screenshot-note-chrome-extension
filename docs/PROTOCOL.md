@@ -49,7 +49,7 @@ Rozšíření → host:
 | `hello` | `protocol`, `extensionVersion`, `browser` | posílá se po připojení |
 | `pong` | `id`, `protocol`, `enabled` | odpověď na `ping` |
 | `capture.result` | `id`, `bundle` | výsledek, formát viz níže |
-| `capture.error` | `id`, `code`, `message` | `disabled`, `no-tab`, `internal` |
+| `capture.error` | `id`, `code`, `message` | `disabled`, `no-tab`, `too-large`, `internal` |
 
 Host → rozšíření:
 
@@ -105,11 +105,27 @@ Odpověď by měla dorazit do 300 ms. Appka čeká nejvýš 1 s a pak uloží sn
   "summary": { "consoleErrors", "consoleWarnings", "uncaughtErrors", "failedRequests": [ … ], "requestCount" },
   "console": [ ConsoleEntry | ErrorEntry ],
   "har": { "log": { … } },          // HAR 1.2, otevře se v DevTools
-  "elements": [ { "selector", "tag", "role?", "name?", "text?", "rect": {x,y,width,height}, "depth" } ]
+  "elements": [ { "selector", "tag", "role?", "name?", "text?", "rect": {x,y,width,height}, "depth" } ],
+  "trimmed": { "bodies", "network", "console", "elements" }  // jen u zmenšeného bundle
 }
 ```
 
 Redakce probíhá v rozšíření ještě před odesláním. Neredigovaná data rozšíření nikdy neopustí.
+
+### Limity velikosti
+
+- Bundle má pevný strop 16 MiB měřený v UTF-8 bajtech (`MAX_BUNDLE_BYTES` v `src/lib/capture.ts`).
+- Když je větší, rozšíření ho zmenšuje: nejdřív zahodí těla, pak nejstarší záznamy
+  sítě a konzole podle společné časové hranice, a teprve když se nevejde ani bez nich,
+  ubírá elementy. Zmenšený bundle má `trimmed: {bodies, network, console, elements}`
+  (zda se zahodila těla a počty zahozených záznamů) a v `policy` skutečně použité
+  `includeBodies`. `summary` vždy popisuje celá, nezmenšená data.
+- Když se nevejde ani bez záznamů (např. obří titulek stránky), přijde `capture.error` s kódem `too-large`.
+- Native Messaging (`BridgeWire.swift` v repu `screenshot-note`): bridge skončí na
+  zprávě rozšíření → host nad 64 MiB (`inputLimit`), stejný limit má čtení socketu
+  v appce. Zprávy host → rozšíření nad 1 MiB bridge zahodí (`browserOutputLimit`,
+  odpovídá limitu Chromu). Strop 16 MiB je pod oběma.
+- Content script drží nejvýš 8 Mi znaků záznamů stránky, jednu událost nejvýš 4 Mi znaků.
 
 ## Uložení v Mac appce (návrh)
 

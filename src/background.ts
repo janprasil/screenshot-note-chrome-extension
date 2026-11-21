@@ -1,5 +1,5 @@
 // Service worker: records webRequest traffic per tab and serves capture requests from the Mac app.
-import { buildBundle } from './lib/capture.ts';
+import { MAX_BUNDLE_BYTES, buildFittingBundle } from './lib/capture.ts';
 import { DEFAULT_SETTINGS, NATIVE_HOST, PROTOCOL_VERSION, normalizePolicy } from './lib/defaults.ts';
 import { BODY_TRUNCATED } from './lib/redact.ts';
 import { RingBuffer } from './lib/ring-buffer.ts';
@@ -10,7 +10,6 @@ type Stored = NetworkEntry & { time: number };
 
 const MAX_PER_TAB = 500;
 const MAX_REQUEST_BODY = 64 * 1024;
-const MAX_BUNDLE_BYTES = 32 * 1024 * 1024;
 const extensionVersion = chrome.runtime.getManifest().version;
 
 // Do načtení nastavení se nic nenahrává, uživatel mohl nahrávání vypnout.
@@ -326,10 +325,8 @@ async function capture(policyInput: unknown, target?: unknown): Promise<CaptureB
     extensionVersion,
   };
 
-  let bundle = buildBundle(input);
-  if (JSON.stringify(bundle).length > MAX_BUNDLE_BYTES && policy.includeBodies) {
-    bundle = buildBundle({ ...input, policy: { ...policy, includeBodies: false } });
-  }
+  const bundle = buildFittingBundle(input);
+  if (!bundle) throw new CaptureError('too-large', `Context does not fit into ${MAX_BUNDLE_BYTES} bytes.`);
   return bundle;
 }
 

@@ -82,9 +82,15 @@ Policy může redakci jen přidat, nikdy ubrat:
 | `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF…; schéma (`Bearer`) zůstane |
 | `redactHeaders` | `[]` | vlastní hlavičky ke skrytí, přidají se |
 | `redactQueryParams` | token, code, key… | přidají se k výchozím; platí i pro fragment URL a hlavičky `Location`, `Referer`, `Origin`, `Content-Location` |
-| `redactBodyKeys` | password, token… | JSON a form-urlencoded, přidají se k výchozím |
+| `redactBodyKeys` | password, token… | přidají se k výchozím; navíc vždy klíče obsahující `pass`, `pwd`, `secret`, `token`, `otp`, `cvv`, `card`, `auth`, `key`, `session` (bez ohledu na velikost písmen) |
 | `maxBodyBytes` | 64 KiB | |
 | `windowMs` | 2 min | jak daleko do minulosti |
+
+Těla se redigují po klíčích v JSON, form-urlencoded a multipart (po polích, soubory
+jako `[file]`), i ve vnořeném JSON. Tělo, které bylo oříznuté nebo nejde rozparsovat
+(text, HTML, XML, rozbitý JSON, holý token), se nahradí značkou
+`[body omitted: truncated]` nebo `[body omitted: unparsed]`. `maxBodyBytes` ořízne
+až redigovaný výsledek.
 
 Odpověď by měla dorazit do 300 ms. Appka čeká nejvýš 1 s a pak uloží snímek bez kontextu.
 

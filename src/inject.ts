@@ -1,4 +1,5 @@
 // Runs in the page's MAIN world at document_start and reports console, errors and fetch/XHR.
+import { BODY_TRUNCATED } from './lib/redact.ts';
 import { serializeArg } from './lib/serialize.ts';
 import type { ConsoleLevel, PageEntry } from './lib/types.ts';
 
@@ -159,7 +160,8 @@ function absoluteUrl(url: string): string {
 }
 
 function bodyText(body: unknown): string | undefined {
-  if (typeof body === 'string') return limit(body).responseBody;
+  // Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
+  if (typeof body === 'string') return body.length > MAX_BODY ? BODY_TRUNCATED : body;
   if (body instanceof URLSearchParams) return body.toString();
   if (body instanceof FormData) {
     const fields: string[] = [];

@@ -33,7 +33,12 @@ záložku, jinou záložku si host vyžádat nemůže.
   Stejně se redigují parametry ve fragmentu URL (`#access_token=…`, `#/cesta?token=…`)
   a URL v hlavičkách `Location`, `Referer`, `Origin`, `Content-Location`, `Refresh`
   i v `redirectURL`. URL ve stack trace a ve zprávách chyb se redigují také.
-- [ ] Přiložit těla requestů a odpovědí (klíče `password`, `token`… se skryjí).
+- [ ] Přiložit těla requestů a odpovědí. Klíče obsahující `pass`, `secret`,
+  `token`, `otp`, `card`, `auth`, `key`, `session`… se skryjí v JSON, formulářích
+  i multipart. Oříznutá nebo nerozparsovatelná těla se nahradí značkou
+  `[body omitted: …]`, surový text se nikdy neposílá.
+  Shoda podle části klíče skryje i nevinné klíče (`author`, `monkey`), to je záměr.
+  Hodnoty uvnitř GraphQL dotazu jako textu (`login(password: "…")`) se neredigují.
 - [x] Přiložit mapu elementů. [x] Včetně textů prvků.
 
 Hodnoty polí `password` se do mapy elementů nikdy nedostanou. Argumenty konzole

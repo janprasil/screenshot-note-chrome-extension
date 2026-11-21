@@ -1,6 +1,7 @@
 // Service worker: records webRequest traffic per tab and serves capture requests from the Mac app.
 import { buildBundle } from './lib/capture.ts';
 import { DEFAULT_SETTINGS, NATIVE_HOST, PROTOCOL_VERSION, normalizePolicy } from './lib/defaults.ts';
+import { BODY_TRUNCATED } from './lib/redact.ts';
 import { RingBuffer } from './lib/ring-buffer.ts';
 import type { CaptureBundle, CapturePolicy, Header, NetworkEntry, RecorderSettings, Rect } from './lib/types.ts';
 import type { CollectRequest, CollectResponse } from './content.ts';
@@ -219,11 +220,13 @@ function requestBodyText(body: chrome.webRequest.WebRequestBody | null | undefin
       .flatMap(([key, values]) => values.map((value) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`))
       .join('&');
   }
+  if (body.raw && body.raw.length > 1) return body.raw.some((part) => part.file) ? '[file upload]' : BODY_TRUNCATED;
   const bytes = body.raw?.find((part) => part.bytes)?.bytes;
   if (!bytes) return body.raw?.length ? '[file upload]' : undefined;
-  const slice = bytes.byteLength > MAX_REQUEST_BODY ? bytes.slice(0, MAX_REQUEST_BODY) : bytes;
+  // Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
+  if (bytes.byteLength > MAX_REQUEST_BODY) return BODY_TRUNCATED;
   try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(slice);
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     return '[binary body]';
   }

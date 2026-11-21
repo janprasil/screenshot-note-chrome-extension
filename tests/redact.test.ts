@@ -37,7 +37,7 @@ test('bodies are dropped unless enabled, then keys are redacted', () => {
   const policy = { ...DEFAULT_POLICY, includeBodies: true };
   assert.equal(redactBody('{"user":"jan","nested":{"Password":"x"}}', policy).text, `{"user":"jan","nested":{"Password":"${REDACTED}"}}`);
   assert.equal(redactBody('user=jan&password=x', policy).text, `user=jan&password=${encodeURIComponent(REDACTED)}`);
-  assert.equal(redactBody('plain text', policy).text, 'plain text');
+  assert.equal(redactBody('plain text', policy).text, '[body omitted: unparsed]');
 });
 
 test('truncate respects UTF-8 byte limit', () => {

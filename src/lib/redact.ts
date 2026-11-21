@@ -122,32 +122,148 @@ export function redactUrlsInText(text: string, policy: CapturePolicy): string {
   return text.replace(/\b[a-z][\w+.-]*:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
 }
 
-/** Redacts sensitive JSON keys or form fields and truncates the result. */
-export function redactBody(body: string | undefined, policy: CapturePolicy): { text?: string; truncated: boolean } {
+export const BODY_UNPARSED = '[body omitted: unparsed]';
+export const BODY_TRUNCATED = '[body omitted: truncated]';
+
+// Vlastní značky rozšíření místo těla, ty se posílají beze změny.
+const BODY_MARKERS = new Set(['[binary body]', '[file upload]', '[file]', BODY_UNPARSED, BODY_TRUNCATED]);
+
+// Klíč těla je citlivý, pokud obsahuje některou z těchto částí.
+const SENSITIVE_BODY_PARTS = ['pass', 'pwd', 'secret', 'token', 'otp', 'cvv', 'card', 'auth', 'key', 'session'];
+
+// Jak hluboko se hledá JSON nebo formulář vnořený v hodnotách.
+const MAX_NESTING = 3;
+
+type Sensitive = (key: string) => boolean;
+
+/**
+ * Redaguje citlivé klíče v JSON, form-urlencoded a multipart tělech.
+ * Oříznutá nebo nerozparsovatelná těla nahradí značkou, surový text nikdy nepošle.
+ */
+export function redactBody(
+  body: string | undefined,
+  policy: CapturePolicy,
+  truncated = false,
+  mimeType = '',
+): { text?: string; truncated: boolean } {
   if (body === undefined || !policy.includeBodies) return { truncated: false };
+  if (typeof body !== 'string') return { text: BODY_UNPARSED, truncated: false };
+  if (body === BODY_TRUNCATED || truncated) return { text: BODY_TRUNCATED, truncated: true };
+  if (BODY_MARKERS.has(body)) return { text: body, truncated: false };
   const keys = new Set(policy.redactBodyKeys.map((key) => key.toLowerCase()));
-  let text = body;
-  const trimmed = body.trim();
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      text = JSON.stringify(redactJson(JSON.parse(trimmed), keys));
-    } catch {
-      // Not valid JSON, keep the raw text.
-    }
-  } else if (/^[^=&\s]+=[^&]*(&[^=&\s]+=[^&]*)*$/.test(trimmed)) {
-    const params = new URLSearchParams(trimmed);
-    for (const key of [...params.keys()]) if (keys.has(key.toLowerCase())) params.set(key, REDACTED);
-    text = params.toString();
-  }
-  return truncate(text, policy.maxBodyBytes);
+  const sensitive: Sensitive = (key) => {
+    const lower = key.toLowerCase();
+    return keys.has(lower) || SENSITIVE_BODY_PARTS.some((part) => lower.includes(part));
+  };
+  const text = redactStructured(body, sensitive, typeof mimeType === 'string' ? mimeType.toLowerCase() : '', 0);
+  return text === undefined ? { text: BODY_UNPARSED, truncated: false } : truncate(text, policy.maxBodyBytes);
 }
 
-function redactJson(value: unknown, keys: Set<string>): unknown {
-  if (Array.isArray(value)) return value.map((item) => redactJson(item, keys));
+function redactStructured(body: string, sensitive: Sensitive, mimeType: string, depth: number): string | undefined {
+  const trimmed = body.trim();
+  if (trimmed === '') return '';
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.stringify(redactJson(JSON.parse(trimmed), sensitive, depth));
+    } catch {
+      return undefined;
+    }
+  }
+  if (trimmed.startsWith('--')) return redactMultipart(body, sensitive, depth);
+  // Webový formulář (i multipart, který Chrome předá jako formData) smí mít pole bez hodnoty.
+  if (isFormBody(trimmed, mimeType.includes('form'))) return redactForm(trimmed, sensitive, depth);
+  return undefined;
+}
+
+/**
+ * Form-urlencoded bez mezer, uvozovek a středníků, v každém poli nejvýš jedno `=`.
+ * Pole bez `=` jsou povolená jen u těla s form Content-Type, jinak by prošel holý token.
+ */
+function isFormBody(text: string, declaredForm: boolean): boolean {
+  if (/[\s";]/.test(text) || !text.includes('=')) return false;
+  return text.split('&').every((part) => {
+    const equals = part.split('=').length - 1;
+    if (equals > 1) return false;
+    if (equals === 0) return declaredForm && part.length > 0 && part.length <= 64;
+    const name = part.slice(0, part.indexOf('='));
+    return name.length > 0 && name.length <= 128;
+  });
+}
+
+function redactForm(text: string, sensitive: Sensitive, depth: number): string {
+  return text
+    .split('&')
+    .map((part) => {
+      const index = part.indexOf('=');
+      if (index <= 0) return part;
+      const name = part.slice(0, index);
+      if (sensitive(decodeName(name))) return `${name}=${encodeURIComponent(REDACTED)}`;
+      const nested = redactNested(decodeName(part.slice(index + 1)), sensitive, depth);
+      return nested === undefined ? part : `${name}=${encodeURIComponent(nested)}`;
+    })
+    .join('&');
+}
+
+/** Vnořený JSON v hodnotě se rediguje také; vrací undefined, když hodnota JSON není. */
+function redactNested(value: string, sensitive: Sensitive, depth: number): string | undefined {
+  if (depth >= MAX_NESTING) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return undefined;
+  try {
+    return JSON.stringify(redactJson(JSON.parse(trimmed), sensitive, depth + 1));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Multipart po polích: citlivá pole a soubory se nahradí, epilog se zahodí, jinak undefined. */
+function redactMultipart(body: string, sensitive: Sensitive, depth: number): string | undefined {
+  const match = /^--([^\r\n]{1,200})\r?\n/.exec(body);
+  if (!match) return undefined;
+  const delimiter = `--${match[1]}`;
+  const pieces = body.slice(delimiter.length).split(new RegExp(`\\r?\\n${escapeRegExp(delimiter)}`));
+  const output: string[] = [];
+  let closed = false;
+  for (const piece of pieces) {
+    if (piece.startsWith('--')) {
+      closed = true;
+      break;
+    }
+    const part = /^\r?\n([\s\S]*?)\r?\n\r?\n([\s\S]*)$/.exec(piece);
+    if (!part) return undefined;
+    const [, head, value] = part;
+    const disposition = /^content-disposition:(.*)$/im.exec(head)?.[1];
+    const name = disposition ? /(?:^|;)\s*name="([^"]*)"/i.exec(disposition)?.[1] : undefined;
+    if (name === undefined) return undefined;
+    let redacted: string;
+    if (/(?:^|;)\s*filename\*?=/i.test(disposition!)) redacted = '[file]';
+    else if (sensitive(name)) redacted = REDACTED;
+    else if (/^content-type:.*x-www-form-urlencoded/im.test(head) && isFormBody(value.trim(), true)) redacted = redactForm(value.trim(), sensitive, depth + 1);
+    else redacted = redactNested(value, sensitive, depth) ?? value;
+    output.push(`\r\n${head}\r\n\r\n${redacted}`);
+  }
+  if (!closed) return undefined;
+  return `${delimiter}${output.join(`\r\n${delimiter}`)}\r\n${delimiter}--\r\n`;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Pole typu {"name": "password", "value": "…"} skryjí i hodnotu.
+const PAIR_NAME_KEYS = ['name', 'field', 'key', 'id'];
+
+function redactJson(value: unknown, sensitive: Sensitive, depth: number): unknown {
+  if (Array.isArray(value)) return value.map((item) => redactJson(item, sensitive, depth));
+  if (typeof value === 'string') return redactNested(value, sensitive, depth) ?? value;
   if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const pairIsSensitive = PAIR_NAME_KEYS.some((key) => typeof record[key] === 'string' && sensitive(record[key] as string));
     const output: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value)) {
-      output[key] = keys.has(key.toLowerCase()) ? REDACTED : redactJson(item, keys);
+    for (const [key, item] of Object.entries(record)) {
+      const hide = sensitive(key) || (pairIsSensitive && key === 'value');
+      // defineProperty zachová i klíč __proto__.
+      Object.defineProperty(output, key, { value: hide ? REDACTED : redactJson(item, sensitive, depth), enumerable: true, writable: true, configurable: true });
     }
     return output;
   }

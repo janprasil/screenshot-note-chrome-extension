@@ -78,9 +78,9 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
   const requestHeaders = redactHeaders(entry.requestHeaders, policy);
   const responseHeaders = redactHeaders(entry.responseHeaders, policy);
   const time = entry.endTime ? Math.max(0, entry.endTime - entry.startTime) : -1;
-  const requestBody = redactBody(page?.requestBody ?? entry.requestBody, policy);
-  const responseBody = redactBody(page?.responseBody, policy);
   const mimeType = headerValue(entry.responseHeaders, 'content-type') ?? page?.responseType ?? '';
+  const requestBody = redactBody(page?.requestBody ?? entry.requestBody, policy, false, headerValue(entry.requestHeaders, 'content-type'));
+  const responseBody = redactBody(page?.responseBody, policy, page?.truncated, mimeType);
   const status = entry.statusCode ?? page?.status ?? 0;
 
   return {
@@ -131,7 +131,7 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
 function pageOnlyEntry(page: PageRequestEntry, pageId: string, policy: CapturePolicy) {
   const url = redactUrl(page.url, policy);
   const requestBody = redactBody(page.requestBody, policy);
-  const responseBody = redactBody(page.responseBody, policy);
+  const responseBody = redactBody(page.responseBody, policy, page.truncated, page.responseType);
   return {
     pageref: pageId,
     startedDateTime: new Date(page.time).toISOString(),

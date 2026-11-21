@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Screenshot Note: test mapy elementů</title>
+<style>
+  /* Ostré hrany a kontrastní barvy, aby šlo posun o pár pixelů poznat od oka. */
+  body { margin: 0; font: 14px -apple-system, sans-serif; background: #fff; }
+  header { position: sticky; top: 0; height: 48px; background: #222; color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 12px; }
+  header button { height: 28px; }
+  .corner { position: fixed; width: 40px; height: 40px; background: #e33; }
+  .tl { left: 0; top: 48px; } .tr { right: 0; top: 48px; } .bl { left: 0; bottom: 0; } .br { right: 0; bottom: 0; }
+  main { padding: 24px 64px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 120px); gap: 16px; }
+  .grid div { height: 60px; background: #39f; outline: 1px solid #000; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .grid div:nth-child(odd) { background: #2a2; }
+  .nested { margin-top: 24px; padding: 16px; background: #fc3; width: 420px; }
+  .nested section { padding: 12px; background: #f80; }
+  .nested section p { margin: 0; padding: 8px; background: #fff; }
+  .tall { height: 1600px; background: linear-gradient(#fff, #ddd); margin-top: 24px; }
+  .tall button { margin: 400px 0 0 200px; }
+</style>
+</head>
+<body>
+<header><strong>Mapa elementů</strong><button>Uložit</button><button>Zrušit</button><input placeholder="Hledat"></header>
+<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+<main>
+  <p>Zkus: zoom 100 % a 125 % (⌘+), Retina i externí displej, okno posunuté a částečně mimo obrazovku, odscrollovaná stránka, sbalený pinch zoom.</p>
+  <div class="grid">
+    <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
+    <div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div>
+  </div>
+  <div class="nested"><section><p>Vnořený odstavec ve dvou rodičích</p></section></div>
+  <div class="tall"><button>Tlačítko níž na stránce</button></div>
+</main>
+</body>
+</html>

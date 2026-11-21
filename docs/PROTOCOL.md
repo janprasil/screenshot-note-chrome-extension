@@ -172,13 +172,36 @@ snímku `R` (globální body) a `backingScale` obrazovky.
 
 ```text
 zoom        = geometry.devicePixelRatio / backingScale      // zoom stránky
-contentLeft = geometry.screenX                              // macOS nemá boční rámečky
-contentTop  = geometry.screenY + geometry.outerHeight - geometry.innerHeight * zoom
+contentLeft = geometry.screenX * zoom                       // macOS nemá boční rámečky
+contentTop  = (geometry.screenY + geometry.outerHeight) * zoom - geometry.innerHeight * zoom
 screenRect  = (contentLeft + x*zoom, contentTop + y*zoom, width*zoom, height*zoom)
 imageRect   = (screenRect - R.origin) * scaleSnímku
 ```
 
-- DevTools ukotvené vlevo nebo dole tento výpočet rozbijí. Přesnější zdroj je
+- `backingScale` ve vzorci je měřítko displeje, na kterém leží většina okna prohlížeče
+  (podle něj Chrome hlásí `devicePixelRatio`), ne nutně displeje snímku.
+- Mac ukládá výřez do `<obrázek>.context.json` pod klíč `capture` (klíč z rozšíření zahodí):
+  `{rect, backingScale, imageScale, browserScale?, window?, webAreas?}`. `rect`, `window`
+  a `webAreas` jsou globální body s počátkem vlevo nahoře, `imageScale` = pixely obrázku na bod.
+  Prozradí rozložení displejů a polohu okna (jde do exportu s kontextem).
+  Zatím jen u celoobrazovkového snímku (`-m`, `-D n`) se zapnutou mapou elementů. Výběr
+  oblasti (`-i`) výřez nezná, kontext má bez `capture` a mapa se nepoužije. U `-D` se
+  `capture` neuloží, když má jiný displej stejnou velikost (pořadí `-D` není zdokumentované).
+- `webAreas`: kandidáti `AXWebArea` s adresou `http(s)`, `file` nebo `about` (ne DevTools,
+  postranní panely ani interní stránky), hledaní na pozadí nejvýš 0,3 s. Platí ten, jehož
+  velikost odpovídá `innerWidth/innerHeight * zoom`. Dotaz může v Chromu zapnout podporu
+  Accessibility do konce jeho běhu.
+- Když Mac zná okno prohlížeče z WindowServeru (`capture.window`), počítá místo `screenX`
+  a `outerHeight` z něj: `contentLeft = window.x`, `contentTop = window.maxY - innerHeight * zoom`.
+  Když se `innerWidth * zoom` liší od šířky okna (DevTools nebo panel po straně), mapa bez
+  přesné `webAreas` není.
+- Pinch zoom: `x' = (x - visualViewport.offsetLeft) * visualViewport.scale`, totéž pro y.
+- Prvky se oříznou na viewport i výřez; nulové nebo zcela mimo se vynechají.
+  `devicePixelRatio` 0 (záložní geometrie bez content scriptu) znamená žádnou mapu.
+- Ladění: `defaults write cz.janprasil.screenshotnote BrowserContextDebugElements -bool true`
+  uloží kopii snímku s obdélníky do `$TMPDIR/ScreenshotNote-elements/` (0700, po dni se maže) a cestu zaloguje
+  (`Browser bridge element map`). Testovací stránka: `docs/test-pages/element-map.html`.
+- DevTools ukotvené dole tento výpočet rozbijí. Přesnější zdroj je
   Accessibility API: `AXWebArea` okna prohlížeče má přesnou pozici obsahu. Pokud
   appka má oprávnění Accessibility, použije ji, jinak výpočet výše.
 - Hit-test v editoru: klik vybere nejmenší element obsahující bod. Opakovaný klik

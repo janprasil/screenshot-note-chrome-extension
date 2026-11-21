@@ -147,7 +147,7 @@ assets/
   a `<obrázek>.png.har` (0600). `Draft.contexts` mapuje obrázek → soubor kontextu (volitelné pole).
 - Název v `assets/` musí být volný pro `.png`, `.context.json` i `.har` (kolize jako u PNG: `Název-1 2`).
   Index relace nese hashe všech tří souborů. Znovuotevření najde kontext podle názvu obrázku.
-- Cloudové složky kontext zatím zahodí (upload je F6).
+- Cloudové složky viz „Cloud“ níže.
 - Kontext se exportuje jen do složky, která ho má podle aktuálního nastavení zapnutý.
 - „Odebrat kontext“ v komposeru smaže soubory v draftu; u znovuotevřené relace si draft pamatuje původní název (`Draft.removedContexts`) a `assets/<název>.context.json` a `.har` se smažou až po zápisu Markdownu.
 - Do Markdownu jde nový placeholder `{context}` (souhrn: řádek `- Screenshot N: …` za snímek
@@ -164,6 +164,18 @@ assets/
   U zmenšeného bundle přibude řádek `Zmenšeno kvůli velikosti: bez těl, N requestů…`.
   Počty v titulku jsou ze `summary` (celá data). Při čtení uložené relace se callout
   z popisku obrázku odstraní a znovu vygeneruje ze souborů v `assets/`.
+
+## Cloud (F6)
+
+- Politika kontextu cloudové složky platí jen na daném Macu (`CloudContextPolicies` v UserDefaults), výchozí stav vypnuto, zapnutí potvrzuje varování.
+- Job ve frontě nese `attachments: [{index, kind: "context"|"har", bytes, sha256}]` jen pro nové snímky, soubory `<index>.context.json` a `<index>.har` leží vedle PNG v jobu. Strop přílohy je 16 MiB.
+- Upload: po commitu relace `PUT /api/v1/sessions/{id}/attachments/{index}/{kind}` (`x-bytes`, `x-sha256`). Opakovaný job pošle přílohy znovu, stejný hash server jen potvrdí.
+- Detail relace má u obrázku `attachments: [{kind, bytes, sha256, path}]`. Prázdný seznam Mac ukládá jako nil, otisk starších relací se nemění.
+- Synchronizace složky zapíše přílohy do `assets/<název>.context.json` a `.har` (0600) a jejich hashe do indexu relace. Odebraná příloha se smaže jen tehdy, když přišla z cloudu.
+- „Odebrat kontext“ u znovuotevřené cloudové relace zařadí `DELETE` příloh (fronta `.attachment-removals`), pošle se po doplnění relace.
+- Řádky Element v cloudu mají selektor a text prvku jen u snímku s kontextem.
+- Web: callout pod snímkem a stažení HAR a konzole jen pro členy library relace. Sdílené odkazy přílohy nevidí. MCP: `browser_context.summary` v `get_session` a nástroj `get_browser_context`.
+- Šifrování zatím není (rozhodnutí 21. 11. 2026).
 
 ## Mapování elementů na snímek
 

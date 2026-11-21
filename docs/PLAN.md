@@ -16,12 +16,13 @@ network (HAR) a mapu elementů. Element se pak dá vybrat a popsat v anotaci.
 - [x] Mac F4 (`feat/browser-context-p4` nad p3, commity `b13d584`, `924d890`, nepushnuto): jen celoobrazovkové snímky (`-m`, `-D`), výběr oblasti mapu nemá (vlastní výběr je varianta B na později). `capture` v `.context.json` (výřez, měřítka, okno, kandidáti AXWebArea), přepočet elementů na pixely obrázku, ladicí kopie s obdélníky (`BrowserContextDebugElements`), testovací stránka `docs/test-pages/element-map.html`. Čeká na ruční ověření.
 - [x] Mac: uložení `.context.json` + `.har`, placeholder `{context}`, callout pod obrázkem (F2).
 - [x] Mac F5 (`feat/browser-context-p5` nad p4, commity `6aada50`, `ada130f`, nepushnuto): nástroj Element v editoru anotací (jen s mapou odpovídající velikosti obrázku), hover, klik = nejmenší prvek, opakovaný klik nebo ⌥ = rodič, Esc zruší, Enter potvrdí popis. Mark s číslem a daty prvku (zpětně kompatibilní Codable), přerušovaný obdélník s odznakem. Export `- **[n] Element** `selector` „name“: popis` pod popisek; bez kontextu a v cloudu jen čísla a popisy. Ořez posune `capture` v exportovaném kontextu. Čeká na ruční ověření.
-- [ ] Web/cloud: upload příloh (vypnuto pro cloud), šifrování podle rozhodnutí v PRIVACY.md, zobrazení na webu a v MCP.
+- [x] Mac F6 (`feat/browser-context-p6` nad p5) + web (`feat/browser-context-attachments`, migrace `20261121300000` aplikovaná na dev DB): politika kontextu cloudové složky (na Macu, výchozí vypnuto), upload `.context.json` a `.har` po commitu, stažení do `assets/`, řádky Element s daty stránky, mazání příloh, callout a stažení na webu jen pro členy, MCP `get_browser_context`. Bez šifrování. Čeká na ruční ověření.
+- [ ] Šifrování příloh v cloudu (PRIVACY.md), zatím odloženo.
 - [ ] Později: těla přes `chrome.debugger` (volitelný režim), Safari Web Extension, Firefox, shadow DOM a iframy v mapě elementů, picker elementu přímo v prohlížeči.
 
 ## Otevřená rozhodnutí
 
-- Šifrování cloudu: varianta B nebo C (PRIVACY.md).
+- Šifrování cloudu: odloženo, zatím bez šifrování (PRIVACY.md).
 - Distribuce: Chrome Web Store (veřejně/unlisted) vs. jen vývojová instalace.
 - Zda je kontext součástí placeného tarifu.
 

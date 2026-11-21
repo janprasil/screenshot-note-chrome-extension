@@ -62,8 +62,8 @@ o konzoli je proto jen zapnout, nebo vypnout.
 
 Výchozí stav:
 - Lokální složky: kontext zapnutý.
-- Cloudové složky: kontext vypnutý. Zapnutí vyžaduje zaškrtnutí a zobrazí varování
-  o citlivosti.
+- Cloudové složky: kontext vypnutý. Zapnutí platí jen na daném Macu, vyžaduje zaškrtnutí
+  a zobrazí varování o citlivosti a o tom, že přílohy uvidí všichni členové složky.
 
 Šifrování kontextových příloh (`.har`, `.context.json`), návrh k rozhodnutí:
 
@@ -73,7 +73,9 @@ Výchozí stav:
 | B. klíč složky v Keychain | AES-256-GCM per soubor, klíč složky na Macu | potřebuje klíč (export/passphrase) | klíč se musí předat |
 | C. B + wrap klíče pro členy | klíč složky obalený X25519 klíčem každého člena | odemknutí v prohlížeči (WebCrypto) | automaticky |
 
-Doporučení: začít s B pro osobní cloudové složky. Variantu C řešit spolu
+Rozhodnutí Jana 21. 11. 2026: zatím bez šifrování (varianta A), šifrování promyslet později.
+
+Původní doporučení: začít s B pro osobní cloudové složky. Variantu C řešit spolu
 s týmovými složkami, protože vyžaduje správu veřejných klíčů členů. Server nikdy
 nevidí klíč, MCP pak kontext nečte, dokud ho klient nedešifruje. To je třeba
 zohlednit v MCP nástrojích.

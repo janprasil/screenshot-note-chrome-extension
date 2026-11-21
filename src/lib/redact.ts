@@ -1,4 +1,4 @@
-import { AUTH_HEADERS, COOKIE_HEADERS } from './defaults.ts';
+import { AUTH_HEADERS, BENIGN_HEADERS, COOKIE_HEADERS, SENSITIVE_NAME_PATTERN } from './defaults.ts';
 import type { CapturePolicy, Header } from './types.ts';
 
 export const REDACTED = '[redacted]';
@@ -35,7 +35,8 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     if (policy.redactCookies && lower === 'set-cookie') {
       return { name, value: value.split('\n').map(redactSetCookieHeader).join('\n') };
     }
-    if (policy.redactAuthHeaders && AUTH_HEADERS.includes(lower)) return { name, value: redactAuthValue(value) };
+    const sensitiveName = AUTH_HEADERS.includes(lower) || (SENSITIVE_NAME_PATTERN.test(lower) && !BENIGN_HEADERS.includes(lower));
+    if (policy.redactAuthHeaders && sensitiveName) return { name, value: redactAuthValue(value) };
     if (custom.has(lower)) return { name, value: REDACTED };
     if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
     if (lower === 'refresh') return { name, value: value.replace(/(url\s*=\s*)(\S+)/i, (_match, prefix: string, url: string) => prefix + redactUrl(url, policy)) };
@@ -53,7 +54,7 @@ function redactAuthValue(value: string): string {
 export function redactUrl(url: string, policy: CapturePolicy): string {
   if (typeof url !== 'string') return '';
   const names = new Set(policy.redactQueryParams.map((name) => name.toLowerCase()));
-  const sensitive = (name: string) => names.has(name.toLowerCase());
+  const sensitive = (name: string) => names.has(name.toLowerCase()) || SENSITIVE_NAME_PATTERN.test(name);
   let base = url;
   let query: string | undefined;
   let fragment: string | undefined;

@@ -21,6 +21,12 @@ export const AUTH_HEADERS = [
   'x-xsrf-token',
 ];
 
+/** Citlivé jméno hlavičky nebo query parametru, platí navíc k přesným seznamům. */
+export const SENSITIVE_NAME_PATTERN = /token|secret|key|auth|session|csrf|signature|credential|password|pass|pwd|otp|jwt|assertion|oidc|principal|appcheck|dpop/i;
+
+// Hlavičky, které vzor zachytí, ale jejich hodnota nic citlivého nenese.
+export const BENIGN_HEADERS = ['keep-alive', 'access-control-allow-credentials', 'www-authenticate', 'proxy-authenticate'];
+
 export const DEFAULT_POLICY: CapturePolicy = {
   includeConsole: true,
   includeNetwork: true,
@@ -32,7 +38,7 @@ export const DEFAULT_POLICY: CapturePolicy = {
   redactHeaders: [],
   redactQueryParams: [
     'token', 'access_token', 'refresh_token', 'id_token', 'code', 'state',
-    'key', 'api_key', 'apikey', 'password', 'secret', 'signature', 'sig', 'session',
+    'key', 'api_key', 'apikey', 'password', 'secret', 'signature', 'sig', 'session', 'jwt', 'sid', 'phpsessid', 'ticket',
   ],
   redactBodyKeys: ['password', 'passwd', 'secret', 'token', 'access_token', 'refresh_token', 'authorization', 'api_key', 'apikey'],
   maxBodyBytes: 64 * 1024,

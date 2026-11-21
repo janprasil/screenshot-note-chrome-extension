@@ -28,6 +28,14 @@ záložku, jinou záložku si host vyžádat nemůže.
 
 - [x] Skrýt hodnoty cookies (`Cookie`, `Set-Cookie`), jména zůstanou. Vždy.
 - [x] Skrýt autorizační hlavičky (`Authorization`, `X-Api-Key`, CSRF…). Vždy.
+  Kromě přesného seznamu se skryje každá hlavička i query parametr, jehož jméno
+  obsahuje `token`, `secret`, `key`, `auth`, `session`, `csrf`, `signature`,
+  `credential`, `password`, `pass`, `pwd`, `otp`, `jwt`, `assertion`, `oidc`,
+  `principal`, `appcheck` nebo `dpop` (např. `PRIVATE-TOKEN`, `X-Amz-Signature`).
+  Zachytí to i nevinná jména (`keyword`, `author`), to je záměr. Výjimky jsou
+  `Keep-Alive`, `Access-Control-Allow-Credentials`, `WWW-Authenticate`
+  a `Proxy-Authenticate`. URL vnořené v hodnotě parametru (`redirect_uri=…`)
+  se zatím znovu neredigují.
 - [ ] Vlastní hlavičky ke skrytí (seznam).
 - [x] Skrýt citlivé query parametry (token, code, key…). Výchozí seznam vždy.
   Stejně se redigují parametry ve fragmentu URL (`#access_token=…`, `#/cesta?token=…`)

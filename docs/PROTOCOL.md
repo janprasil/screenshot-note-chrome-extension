@@ -79,9 +79,9 @@ Policy může redakci jen přidat, nikdy ubrat:
 | `includeBodies` | `false` | jen při zapnutém přepínači těl v popupu |
 | `includeElementText` | `true` | texty prvků v mapě elementů |
 | `redactCookies` | `true` | vždy zapnuto; jména cookies zůstanou, hodnoty se skryjí |
-| `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF…; schéma (`Bearer`) zůstane |
+| `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF… a každá hlavička, jejíž jméno odpovídá vzoru `SENSITIVE_NAME_PATTERN` v `src/lib/defaults.ts` (`token`, `secret`, `key`, `auth`, `session`…), kromě `Keep-Alive`, `Access-Control-Allow-Credentials`, `WWW-Authenticate`, `Proxy-Authenticate`; schéma (`Bearer`) zůstane |
 | `redactHeaders` | `[]` | vlastní hlavičky ke skrytí, přidají se |
-| `redactQueryParams` | token, code, key… | přidají se k výchozím; platí i pro fragment URL a hlavičky `Location`, `Referer`, `Origin`, `Content-Location` |
+| `redactQueryParams` | token, code, key, jwt, sid… | přidají se k výchozím; navíc každý parametr se jménem podle stejného vzoru jako u hlaviček; platí i pro fragment URL a hlavičky `Location`, `Referer`, `Origin`, `Content-Location` |
 | `redactBodyKeys` | password, token… | přidají se k výchozím; navíc vždy klíče obsahující `pass`, `pwd`, `secret`, `token`, `otp`, `cvv`, `card`, `auth`, `key`, `session` (bez ohledu na velikost písmen) |
 | `maxBodyBytes` | 64 KiB | |
 | `windowMs` | 2 min | jak daleko do minulosti |

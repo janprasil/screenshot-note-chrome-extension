@@ -94,3 +94,32 @@ test('oversized form bodies are replaced by a marker', async () => {
   const stored = bg.session.data['net:1'] as any[];
   assert.equal(stored[0].requestBody, '[body omitted: truncated]');
 });
+
+test('error stack is redacted like the message', () => {
+  const bundle = buildBundle({
+    page,
+    entries: [{ kind: 'error', time: 1, message: 'x', stack: 'Error: login failed {"password":"HUNTER2"} Bearer abcdefghijkl\n    at f (https://a.example/app.js?token=T:1:1)', unhandledRejection: false, url: page.url }],
+    network: [],
+    policy: DEFAULT_POLICY,
+    extensionVersion: '0',
+    now: 0,
+  });
+  assert.doesNotMatch(JSON.stringify(bundle.console), /HUNTER2|abcdefghijkl|token=T/);
+});
+
+test('console serializer hides sensitive keys with object values and nested JSON strings', () => {
+  const objectValue = serializeArg({ token: { access: 'ACC123', refresh: 'REF456' }, tokens: ['ACC789'], user: 'jan' });
+  assert.doesNotMatch(objectValue, /ACC123|REF456|ACC789/);
+  assert.match(objectValue, /"user": "jan"/);
+  const nested = serializeArg({ data: JSON.stringify({ password: 'SECRET1', id: 7 }) });
+  assert.doesNotMatch(nested, /SECRET1/);
+  assert.match(nested, /"id": 7/);
+  // Řetězec na nejvyšší úrovni projde až redakcí textu.
+  assert.doesNotMatch(redactSecretsInText(JSON.stringify({ token: { access: 'ACC123' }, list: { tokens: ['X1'] } }), DEFAULT_POLICY), /ACC123|X1/);
+});
+
+test('URL redaction in text stays linear on hostile input', () => {
+  const start = performance.now();
+  redactSecretsInText('a.'.repeat(50_000), DEFAULT_POLICY);
+  assert.ok(performance.now() - start < 200, 'redaction took too long');
+});

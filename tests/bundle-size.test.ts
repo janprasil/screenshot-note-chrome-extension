@@ -96,3 +96,14 @@ test('network buffer of one tab is capped by size', async () => {
   assert.ok(entries.length < 100, `${entries.length} entries`);
   assert.ok(entries.some((entry: any) => entry.request.url.startsWith('https://a.example/199/')));
 });
+
+test('partial trimming skips bodies that are already markers', () => {
+  const page = { url: 'https://a.example/', title: 'T', userAgent: 'u', language: 'cs', geometry: { screenX: 0, screenY: 0, outerWidth: 1, outerHeight: 1, innerWidth: 1, innerHeight: 1, devicePixelRatio: 1, scrollX: 0, scrollY: 0 } };
+  const truncated = Array.from({ length: 5 }, (_, index) => ({ kind: 'request' as const, time: index, api: 'fetch' as const, method: 'GET', url: `https://a.example/js${index}`, status: 200, responseType: 'text/javascript', responseBody: 'x'.repeat(100_000), truncated: true }));
+  const json = Array.from({ length: 5 }, (_, index) => ({ kind: 'request' as const, time: 10 + index, api: 'fetch' as const, method: 'GET', url: `https://a.example/api${index}`, status: 200, responseType: 'application/json', responseBody: JSON.stringify({ data: 'y'.repeat(index === 0 ? 30_000 : 1_000) }) }));
+  const input = { page, network: [], entries: [...truncated, ...json], policy: { ...DEFAULT_POLICY, includeBodies: true }, extensionVersion: '0', now: 0 };
+  const full = bundleBytes(buildFittingBundle(input));
+  const bundle = buildFittingBundle(input, full - 10_000)!;
+  assert.equal(bundle.trimmed?.largeBodies, 1);
+  assert.equal(bundle.trimmed?.bodies, false);
+});

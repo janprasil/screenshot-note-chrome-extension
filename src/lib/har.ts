@@ -64,6 +64,17 @@ export function buildHar(input: HarInput): unknown {
   };
 }
 
+/** Párování webRequest záznamů se záznamy stránky stejně jako v HARu. */
+export function pairPageRequests(network: NetworkEntry[], pages: PageRequestEntry[]): Map<NetworkEntry, PageRequestEntry> {
+  const used = new Set<PageRequestEntry>();
+  const pairs = new Map<NetworkEntry, PageRequestEntry>();
+  for (const entry of network.slice().sort((a, b) => a.startTime - b.startTime)) {
+    const page = matchPageRequest(entry, pages, used);
+    if (page) pairs.set(entry, page);
+  }
+  return pairs;
+}
+
 function matchPageRequest(entry: NetworkEntry, pages: PageRequestEntry[], used: Set<PageRequestEntry>) {
   if (entry.type !== 'xmlhttprequest' && entry.type !== 'fetch' && entry.type !== 'other') return undefined;
   let best: PageRequestEntry | undefined;

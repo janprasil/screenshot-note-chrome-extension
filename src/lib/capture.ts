@@ -1,6 +1,6 @@
-import { buildHar } from './har.ts';
+import { buildHar, pairPageRequests } from './har.ts';
 import { summarize } from './summary.ts';
-import { BODY_TOO_LARGE, redactSecretsInText, redactUrl, redactUrlsInText } from './redact.ts';
+import { BODY_TOO_LARGE, redactBody, redactSecretsInText, redactUrl } from './redact.ts';
 import type {
   CaptureBundle,
   CapturePolicy,
@@ -59,7 +59,8 @@ export function buildBundle(input: BundleInput, summary?: CaptureSummary): Captu
 
 function redactLogUrls<T extends ConsoleEntry | ErrorEntry>(entry: T, policy: CapturePolicy): T {
   const copy = { ...entry, url: redactUrl(entry.url, policy) };
-  if (copy.stack) copy.stack = redactUrlsInText(copy.stack, policy);
+  // Stack začíná řádkem `Name: message`, proto stejná redakce jako zpráva.
+  if (copy.stack) copy.stack = redactSecretsInText(copy.stack, policy);
   if (copy.kind === 'console') copy.args = copy.args.map((arg) => redactSecretsInText(arg, policy));
   if (copy.kind === 'error') {
     if (copy.source) copy.source = redactUrl(copy.source, policy);
@@ -150,14 +151,24 @@ type BodyField = 'requestBody' | 'responseBody';
  * Vrací undefined, když ani několik kol nestačí; pak se zahodí všechna těla.
  */
 function dropLargestBodies(input: BundleInput, summary: CaptureSummary, size: number, maxBytes: number): { bundle: CaptureBundle; dropped: number } | undefined {
+  const { policy } = input;
   const bodies: { list: 'network' | 'entries'; index: number; field: BodyField; size: number }[] = [];
+  // Velikost je délka těla po redakci; značky a ořezaná těla skoro nic nezaberou.
+  const add = (list: 'network' | 'entries', index: number, field: BodyField, body: string | undefined, truncated?: boolean, mime?: string) => {
+    const size = redactBody(body, policy, truncated, mime).text?.length ?? 0;
+    if (size > 100) bodies.push({ list, index, field, size });
+  };
+  const pages = input.entries.filter((entry): entry is PageRequestEntry => entry.kind === 'request');
+  const pairs = pairPageRequests(input.network, pages);
   input.network.forEach((entry, index) => {
-    if (entry.requestBody) bodies.push({ list: 'network', index, field: 'requestBody', size: entry.requestBody.length });
+    // Tělo ze záznamu stránky má v HARu přednost, síťové se pak nepoužije.
+    if (pairs.get(entry)?.requestBody !== undefined) return;
+    add('network', index, 'requestBody', entry.requestBody, false, entry.requestHeaders?.find((header) => header.name.toLowerCase() === 'content-type')?.value);
   });
   input.entries.forEach((entry, index) => {
     if (entry.kind !== 'request') return;
-    if (entry.requestBody) bodies.push({ list: 'entries', index, field: 'requestBody', size: entry.requestBody.length });
-    if (entry.responseBody) bodies.push({ list: 'entries', index, field: 'responseBody', size: entry.responseBody.length });
+    add('entries', index, 'requestBody', entry.requestBody);
+    add('entries', index, 'responseBody', entry.responseBody, entry.truncated, entry.responseType);
   });
   bodies.sort((a, b) => b.size - a.size);
 

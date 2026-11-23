@@ -120,7 +120,8 @@ function decodeName(name: string): string {
 /** Redaguje všechny absolutní URL nalezené ve volném textu, např. ve stack trace. */
 export function redactUrlsInText(text: string, policy: CapturePolicy): string {
   if (typeof text !== 'string') return text;
-  return text.replace(/\b[a-z][\w+.-]*:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
+  // Omezené schéma a lookbehind brání kvadratickému běhu na textu typu `a.a.a.…`.
+  return text.replace(/(?<![\w+.-])[a-z][\w+.-]{0,31}:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
 }
 
 export const BODY_UNPARSED = '[body omitted: unparsed]';
@@ -166,17 +167,21 @@ function sensitiveBodyKey(policy: CapturePolicy): Sensitive {
   };
 }
 
-// Dvojice "klíč": "hodnota" nebo "klíč": číslo ve volném textu.
-const TEXT_PAIR = /"((?:[^"\\\n]|\\.){1,128})"(\s*:\s*)("(?:[^"\\\n]|\\.)*"|-?\d[\d.eE+-]*)/g;
+// Dvojice "klíč": hodnota ve volném textu; hodnota je řetězec, číslo, nebo objekt či pole bez dalšího zanoření.
+const TEXT_PAIR = /"((?:[^"\\\n]|\\.){1,128})"(\s*:\s*)("(?:[^"\\\n]|\\.)*"|-?\d[\d.eE+-]*|\{[^{}]*\}|\[[^[\]]*\])/g;
 const TEXT_AUTH = /\b(Bearer|Basic|Digest|Token)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 
 /** Redaguje URL, autorizační hodnoty a citlivé dvojice klíč–hodnota ve volném textu, např. v argumentech konzole. */
 export function redactSecretsInText(text: string, policy: CapturePolicy): string {
   if (typeof text !== 'string') return text;
   const sensitive = sensitiveBodyKey(policy);
-  return redactUrlsInText(text, policy)
-    .replace(TEXT_AUTH, (_match, scheme: string) => `${scheme} ${REDACTED}`)
-    .replace(TEXT_PAIR, (match, key: string, separator: string) => (sensitive(key) ? `"${key}"${separator}"${REDACTED}"` : match));
+  const pairs = (input: string): string =>
+    input.replace(TEXT_PAIR, (match, key: string, separator: string, value: string) => {
+      if (sensitive(key)) return `"${key}"${separator}"${REDACTED}"`;
+      // Necitlivý objekt nebo pole může mít citlivé klíče uvnitř.
+      return value.startsWith('{') || value.startsWith('[') ? `"${key}"${separator}${value[0]}${pairs(value.slice(1))}` : match;
+    });
+  return pairs(redactUrlsInText(text, policy).replace(TEXT_AUTH, (_match, scheme: string) => `${scheme} ${REDACTED}`));
 }
 
 function redactStructured(body: string, sensitive: Sensitive, mimeType: string, depth: number): string | undefined {

@@ -59,11 +59,14 @@ záložku, jinou záložku si host vyžádat nemůže.
   Hodnoty uvnitř GraphQL dotazu jako textu (`login(password: "…")`) se neredigují.
 - [x] Přiložit mapu elementů. [x] Včetně textů prvků.
 
-Hodnoty polí `password` se do mapy elementů nikdy nedostanou. V argumentech
-konzole a ve zprávách chyb se redigují URL, hodnoty `Bearer`/`Basic`/`Token`
-a dvojice `"klíč": hodnota` s citlivým klíčem (stejný seznam jako u těl).
-Volný text bez struktury (`heslo je hunter2`) rozpoznat nejde, rozhodnutí
-o konzoli je proto hlavně zapnout, nebo vypnout.
+Hodnoty polí `password` se do mapy elementů nikdy nedostanou. Objekty v argumentech
+konzole skryjí hodnoty citlivých klíčů už ve stránce (i objekty a pole, i JSON
+uložený v řetězci). V argumentech konzole, ve zprávách chyb a ve stacku se dál
+redigují URL, hodnoty `Bearer`/`Basic`/`Token` a dvojice `"klíč": hodnota`
+s citlivým klíčem. Volný text bez struktury (`heslo je hunter2`), JSON
+s jednoduchými uvozovkami nebo JSON uprostřed věty rozpoznat nejde, rozhodnutí
+o konzoli je proto hlavně zapnout, nebo vypnout. Vnořený rozbitý JSON s klíči
+se raději zahodí celý, i když tajemství neobsahuje.
 
 ## Cloud
 

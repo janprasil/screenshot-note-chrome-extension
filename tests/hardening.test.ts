@@ -144,7 +144,13 @@ test('quoted Refresh URLs are redacted', async () => {
   const [header] = redactHeaders([{ name: 'Refresh', value: '0; url="https://user:SECRET@a.example/x?token=T"' }], DEFAULT_POLICY);
   assert.doesNotMatch(header.value, /SECRET|token=T/);
   assert.match(header.value, /^0; url="https:\/\//);
-  for (const value of ["0; url=https://a.example/o'neil?token=SECRET", `0; url="https://a.example/o'neil?token=SECRET"`, "0; url='https://a.example/x?token=SECRET'"]) {
+  for (const value of [
+    "0; url=https://a.example/o'neil?token=SECRET",
+    `0; url="https://a.example/o'neil?token=SECRET"`,
+    "0; url='https://a.example/x?token=SECRET'",
+    '0; url="https://user:SECRET@a.example/x',
+    '0; url="https://user:SECRET@a.example/x"; extra',
+  ]) {
     assert.doesNotMatch(redactHeaders([{ name: 'Refresh', value }], DEFAULT_POLICY)[0].value, /SECRET/);
   }
 });

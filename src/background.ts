@@ -298,10 +298,15 @@ export interface CaptureTarget {
   tabId?: number;
 }
 
+/** Cílová záložka; anonymní se odmítne, nikdy se nenahradí jinou. */
 async function findTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
+  const tab = await pickTab(input);
+  return tab?.incognito ? undefined : tab;
+}
+
+async function pickTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
   let target = parseTarget(input);
-  // Anonymní okna se nikdy neexportují, ani když je rozšíření v anonymním režimu povolené.
-  const windows = (await chrome.windows.getAll({ populate: true, windowTypes: ['normal', 'popup', 'app'] })).filter((window) => !window.incognito);
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal', 'popup', 'app'] });
   const activeTab = (window: chrome.windows.Window) => window.tabs?.find((tab) => tab.active);
 
   // Přímé tabId platí jen pro aktivní záložku některého okna, jinak se cíl ignoruje.

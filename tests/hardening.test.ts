@@ -179,10 +179,14 @@ test('ring buffer drops entries older than the window on push', () => {
 test('incognito windows are never captured', async () => {
   const bg = await loadBackground({
     settings: { enabled: true, recordBodies: false, bufferMs: 300_000 },
-    windows: [{ id: 1, focused: true, incognito: true, left: 0, top: 0, width: 1200, height: 800, tabs: [{ id: 1, windowId: 1, active: true, url: 'https://a.example/', title: 'A' }] } as any],
+    windows: [
+      { id: 2, focused: false, left: 0, top: 0, width: 800, height: 600, tabs: [{ id: 2, windowId: 2, active: true, url: 'https://b.example/', title: 'B' }] },
+      { id: 1, focused: true, incognito: true, left: 0, top: 0, width: 1200, height: 800, tabs: [{ id: 1, windowId: 1, active: true, incognito: true, url: 'https://a.example/', title: 'A' }] } as any,
+    ],
     collect: () => ({ page: { ...page }, entries: [] }),
   });
   await tick();
-  const reply = await bg.request({ type: 'capture.request', id: 'inc' });
-  assert.equal(reply.type, 'capture.error');
+  // Fokusované anonymní okno se odmítne, nevybere se místo něj běžné.
+  assert.equal((await bg.request({ type: 'capture.request', id: 'inc' })).type, 'capture.error');
+  assert.equal((await bg.request({ type: 'capture.request', id: 'inc2', target: { tabId: 1 } })).type, 'capture.error');
 });

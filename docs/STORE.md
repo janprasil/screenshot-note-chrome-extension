@@ -40,7 +40,7 @@ Screenshot Note Context ("the extension") helps you attach technical context to 
 
 *Redaction.* Before any data leaves the browser, the extension redacts cookie values, authorization headers, tokens and other sensitive URL parameters, sensitive fields in request and response bodies (for example passwords, tokens, card numbers) and recognizable secrets in console messages. Redaction is best effort; free text that does not look like a secret cannot be detected.
 
-*Where the data goes.* The extension sends the redacted context only to the Screenshot Note app installed on your Mac, and only when a screenshot is taken or when you download the context yourself from the extension popup. The extension itself does not send data to any server. If you save the screenshot to a Screenshot Note cloud folder, the Screenshot Note app uploads the context together with the screenshot according to that folder's settings; that upload is covered by the Screenshot Note privacy policy.
+*Where the data goes.* The extension sends the redacted context only to the Screenshot Note app installed on your Mac, and only when a screenshot is taken or when you download the context yourself from the extension popup. The extension itself does not send data to any server. If you save the screenshot to a Screenshot Note cloud folder, the Screenshot Note app uploads the context together with the screenshot according to that folder's settings; that upload is covered by the privacy policy of the Screenshot Note cloud, operated by Performance4 s.r.o.
 
 *What we do not do.* We do not sell data, use it for advertising, or share it with third parties.
 

@@ -1,6 +1,6 @@
 # Extension ↔ Screenshot Note protocol (v1)
 
-Contract between this extension and the Screenshot Note macOS app.
+Contract between this extension and the Screenshot Note macOS app. How the app stores and syncs the context is described in `docs/BROWSER-CONTEXT.md` of the `screenshot-note` repository.
 
 ## Architecture
 

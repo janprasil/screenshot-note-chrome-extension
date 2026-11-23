@@ -1,4 +1,4 @@
-// Zabalí dist/ pro Chrome Web Store: bez pole `key`, které Store odmítne.
+// Packs dist/ for the Chrome Web Store without the `key` field, which the Store rejects.
 import { execFileSync } from 'node:child_process';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

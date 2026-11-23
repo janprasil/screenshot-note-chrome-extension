@@ -23,16 +23,16 @@ export interface CollectResponse {
   elements?: ReturnType<typeof collectElements>;
 }
 
-// Strop jedné události ještě před parsováním JSONu.
+// Cap for a single event, checked before parsing JSON.
 const MAX_EVENT_CHARS = 4 * 1024 * 1024;
 
 const buffer = new RingBuffer<PageEntry>(2_000, DEFAULT_SETTINGS.bufferMs, MAX_BUFFER_CHARS, entrySize);
 let settings: RecorderSettings = DEFAULT_SETTINGS;
 
 let port: MessagePort | undefined;
-// MAIN skript potvrdil port, další handshake se už nepřijme.
+// The MAIN script confirmed the port; no further handshake is accepted.
 let connected = false;
-// Nabídnuté porty čekají na ACK; MAIN si mohl vzít kterýkoli z nich.
+// Offered ports wait for ACK; the MAIN script may have taken any of them.
 let pending: MessagePort[] = [];
 const MAX_PENDING = 4;
 
@@ -84,7 +84,7 @@ function applySettings(next: RecorderSettings): void {
   sendConfig();
 }
 
-// Bez zapnutého nahrávání těl se těla requestů neukládají.
+// Request bodies are not stored unless body recording is on.
 function withoutBodies(entry: PageEntry): PageEntry {
   if (entry.kind !== 'request') return entry;
   const { requestBody: _request, responseBody: _response, truncated: _truncated, ...rest } = entry;
@@ -96,7 +96,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.settings) applySettings(changes.settings.newValue ?? DEFAULT_SETTINGS);
 });
 
-// DOM patří stránce, chyba v mapě elementů nesmí shodit celý collect.
+// The DOM belongs to the page; an element map error must not break collect.
 function safeElements(includeText: boolean): ReturnType<typeof collectElements> | undefined {
   try {
     return collectElements(includeText);

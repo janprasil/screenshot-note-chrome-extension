@@ -28,7 +28,7 @@ export function summarize(
     consoleWarnings: logs.filter((entry) => entry.kind === 'console' && entry.level === 'warn').length,
     uncaughtErrors: logs.filter((entry) => entry.kind === 'error').length,
     failedRequests: failed.slice(-MAX_FAILED),
-    // Požadavky jen ze záznamu stránky (např. obsloužené service workerem) se počítají také.
+    // Requests seen only by the page recorder (for example served by a service worker) count too.
     requestCount: network.length + pageRequests.length - pairPageRequests(network, pageRequests).size,
   };
 }

@@ -52,7 +52,7 @@ export function buildBundle(input: BundleInput, summary?: CaptureSummary): Captu
     });
   }
   if (policy.includeElements && input.elements) {
-    // Přístupné jméno je také text stránky, bez textů se vynechá i ono.
+    // The accessible name is page text too, so it is omitted without texts.
     bundle.elements = policy.includeElementText ? input.elements : input.elements.map(({ text: _text, name: _name, ...rest }) => rest);
   }
   return bundle;
@@ -60,7 +60,7 @@ export function buildBundle(input: BundleInput, summary?: CaptureSummary): Captu
 
 function redactLogUrls<T extends ConsoleEntry | ErrorEntry>(entry: T, policy: CapturePolicy): T {
   const copy = { ...entry, url: redactUrl(entry.url, policy) };
-  // Stack začíná řádkem `Name: message`, proto stejná redakce jako zpráva.
+  // A stack starts with `Name: message`, so it gets the same redaction as the message.
   if (copy.stack) copy.stack = redactSecretsInText(copy.stack, policy);
   if (copy.kind === 'console') copy.args = copy.args.map((arg) => redactSecretsInText(arg, policy));
   if (copy.kind === 'error') {
@@ -70,7 +70,7 @@ function redactLogUrls<T extends ConsoleEntry | ErrorEntry>(entry: T, policy: Ca
   return copy;
 }
 
-/** Pevný strop velikosti bundle v UTF-8 bajtech. */
+/** Hard bundle size cap in UTF-8 bytes. */
 export const MAX_BUNDLE_BYTES = 16 * 1024 * 1024;
 
 const encoder = new TextEncoder();
@@ -81,15 +81,15 @@ export function bundleBytes(value: unknown): number {
 }
 
 /**
- * Postaví bundle, který se vejde do limitu. Nejdřív zahodí těla, pak nejstarší
- * záznamy sítě a konzole podle společné časové hranice, nakonec elementy.
- * Souhrn vždy popisuje celá data. Když se nevejde ani prázdný, vrátí undefined.
+ * Builds a bundle that fits the limit. Drops bodies first, then the oldest
+ * network and console entries by a shared time cutoff, and elements last.
+ * The summary always describes the full data. Returns undefined when even an empty bundle does not fit.
  */
 export function buildFittingBundle(input: BundleInput, limit = MAX_BUNDLE_BYTES): CaptureBundle | undefined {
   const full = buildBundle(input);
   let size = bundleBytes(full);
   if (size <= limit) return full;
-  // Rezerva na metadata `trimmed`, která se přidají až po měření.
+  // Reserve for the `trimmed` metadata, added after measuring.
   const maxBytes = limit - TRIMMED_RESERVE;
   const { summary } = full;
   const trimmed = { bodies: input.policy.includeBodies, network: 0, console: 0, elements: 0 };
@@ -102,7 +102,7 @@ export function buildFittingBundle(input: BundleInput, limit = MAX_BUNDLE_BYTES)
     if (size <= maxBytes) return { ...bundle, trimmed };
   }
 
-  // Velikost bez záznamů sítě a konzole; když se nevejde, ubírají se elementy.
+  // Size without network and console entries; if it does not fit, elements are dropped.
   const empty: BundleInput = { ...base, network: [], entries: [] };
   let elements = base.elements;
   let fixed = bundleBytes(buildBundle(empty, summary));
@@ -112,8 +112,8 @@ export function buildFittingBundle(input: BundleInput, limit = MAX_BUNDLE_BYTES)
   }
   if (fixed > maxBytes) return undefined;
 
-  // Záznamy od nejnovějšího s odhadem jejich podílu na velikosti bundle.
-  // Při stejném čase rozhoduje pořadí v bufferu, pozdější je novější.
+  // Entries from the newest, with an estimate of their share of the bundle size.
+  // On equal time the buffer order decides; later is newer.
   const items: { time: number; order: number; size: number; value: object }[] = [
     ...base.network.map((entry, order) => ({ time: entry.startTime, order, size: bundleBytes(entry), value: entry })),
     ...base.entries.map((entry, order) => ({ time: entry.time, order, size: bundleBytes(entry), value: entry })),
@@ -148,13 +148,13 @@ export function buildFittingBundle(input: BundleInput, limit = MAX_BUNDLE_BYTES)
 type BodyField = 'requestBody' | 'responseBody';
 
 /**
- * Zahazuje těla od největšího, dokud se bundle nevejde do limitu, malá těla zůstanou.
- * Vrací undefined, když ani několik kol nestačí; pak se zahodí všechna těla.
+ * Drops bodies from the largest until the bundle fits; small bodies stay.
+ * Returns undefined when a few rounds are not enough; then all bodies are dropped.
  */
 function dropLargestBodies(input: BundleInput, summary: CaptureSummary, size: number, maxBytes: number): { bundle: CaptureBundle; dropped: number } | undefined {
   const { policy } = input;
   const bodies: { list: 'network' | 'entries'; index: number; field: BodyField; size: number }[] = [];
-  // Velikost je délka těla po redakci; značky a ořezaná těla skoro nic nezaberou.
+  // Size is the body length after redaction; markers and truncated bodies take almost nothing.
   const add = (list: 'network' | 'entries', index: number, field: BodyField, body: string | undefined, truncated?: boolean, mime?: string) => {
     const size = redactBody(body, policy, truncated, mime).text?.length ?? 0;
     if (size > 100) bodies.push({ list, index, field, size });
@@ -162,7 +162,7 @@ function dropLargestBodies(input: BundleInput, summary: CaptureSummary, size: nu
   const pages = input.entries.filter((entry): entry is PageRequestEntry => entry.kind === 'request');
   const pairs = pairPageRequests(input.network, pages);
   input.network.forEach((entry, index) => {
-    // Tělo ze záznamu stránky má v HARu přednost, síťové se pak nepoužije.
+    // The page entry body wins in the HAR, so the network body is unused.
     if (pairs.get(entry)?.requestBody !== undefined) return;
     add('network', index, 'requestBody', entry.requestBody, false, entry.requestHeaders?.find((header) => header.name.toLowerCase() === 'content-type')?.value);
   });
@@ -175,7 +175,7 @@ function dropLargestBodies(input: BundleInput, summary: CaptureSummary, size: nu
 
   let dropped = 0;
   for (let attempt = 0; attempt < 8 && dropped < bodies.length; attempt++) {
-    // Těla se v bundle objeví nejvýš jednou, odhad bere jejich surovou délku s rezervou.
+    // Bodies appear at most once in the bundle; the estimate uses their raw length with a margin.
     let need = (size - maxBytes) * 1.05;
     while (need > 0 && dropped < bodies.length) need -= bodies[dropped++].size;
     const network = input.network.slice();

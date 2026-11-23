@@ -1,4 +1,4 @@
-// Minimální falešné chrome API pro testy service workeru a content scriptu.
+// Minimal fake chrome API for service worker and content script tests.
 type Listener = { fn: (...args: any[]) => any; filter?: unknown; spec?: string[] };
 
 export class FakeEvent {
@@ -66,9 +66,9 @@ export interface FakeChromeOptions {
   settings?: Record<string, unknown>;
   session?: Record<string, unknown>;
   windows?: FakeWindow[];
-  // Odpověď content scriptu na collect, podle ID záložky.
+  // Content script reply to collect, by tab ID.
   collect?: (tabId: number) => unknown;
-  // Odpověď content scriptu na recorder-status, podle ID záložky.
+  // Content script reply to recorder-status, by tab ID.
   recorderStatus?: (tabId: number) => unknown;
 }
 
@@ -143,7 +143,7 @@ export function installFakeChrome(options: FakeChromeOptions = {}) {
 
 let instance = 0;
 
-/** Načte background.ts jako novou instanci modulu nad čerstvým falešným chrome. */
+/** Loads background.ts as a fresh module instance over a fresh fake chrome. */
 export async function loadBackground(options: FakeChromeOptions = {}) {
   const fake = installFakeChrome(options);
   await import(`../src/background.ts?instance=${++instance}`);
@@ -162,7 +162,7 @@ export async function loadBackground(options: FakeChromeOptions = {}) {
 
 let contentInstance = 0;
 
-/** MessagePort v paměti; skutečný port v Node drží event loop a testy by nedoběhly. */
+/** In-memory MessagePort; a real Node port keeps the event loop alive and tests would hang. */
 class FakePort {
   other?: FakePort;
   closed = false;
@@ -188,19 +188,19 @@ class FakeMessageChannel {
   }
 }
 
-/** Načte content.ts s minimálním document a window. */
+/** Loads content.ts with a minimal document and window. */
 export async function loadContent(settings: Record<string, unknown> = { enabled: true, recordBodies: false, bufferMs: 300_000 }, options: { mainFirst?: boolean } = {}) {
   const fake = installFakeChrome({ settings });
   const document = new EventTarget() as EventTarget & { title: string };
   document.title = 'Page';
   const window = Object.assign(new EventTarget(), { screenX: 0, screenY: 0, outerWidth: 1200, outerHeight: 800, innerWidth: 1200, innerHeight: 700, devicePixelRatio: 2, scrollX: 0, scrollY: 0 }) as any;
   window.top = window;
-  // Zprávy okna se doručují asynchronně jako v prohlížeči.
+  // Window messages are delivered asynchronously, as in the browser.
   window.postMessage = (data: unknown, _origin: string, transfer: MessagePort[] = []) => {
     setTimeout(() => window.dispatchEvent(Object.assign(new Event('message'), { data, source: window, ports: transfer })), 0);
   };
   Object.assign(globalThis, { document, window, location: { href: 'https://app.example.com/' }, MessageChannel: FakeMessageChannel });
-  // Simulovaný MAIN skript: převezme port z handshaku a potvrdí ho.
+  // Simulated MAIN script: takes the port from the handshake and confirms it.
   let mainPort: FakePort | undefined;
   const config: any[] = [];
   window.addEventListener('message', (event: any) => {
@@ -209,12 +209,12 @@ export async function loadContent(settings: Record<string, unknown> = { enabled:
     mainPort.onmessage = (message) => config.push(message.data);
     mainPort.postMessage({ type: 'screenshot-note:ack' });
   });
-  // MAIN skript ohlásí připravenost dřív, než content script pošle hello; obě zprávy čekají na doručení.
+  // The MAIN script announces ready before the content script sends hello; both messages are in flight.
   if (options.mainFirst) window.postMessage({ type: 'screenshot-note:ready' }, '*');
   await import(`../src/content.ts?instance=${++contentInstance}`);
   await new Promise((resolve) => setTimeout(resolve, 20));
   const emit = (entry: unknown) => mainPort!.postMessage(JSON.stringify(entry));
-  // Zprávy přes port jsou asynchronní, collect počká na jejich doručení.
+  // Port messages are asynchronous; collect waits for their delivery.
   const collect = async () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     return new Promise<any>((resolve) => {

@@ -4,7 +4,7 @@ import { loadBackground, loadContent } from './fake-chrome.ts';
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Čeká na podmínku místo pevné pauzy, zprávy přes porty jsou asynchronní. */
+/** Waits for a condition instead of a fixed pause; port messages are asynchronous. */
 async function until(check: () => boolean, timeoutMs = 1_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!check() && Date.now() < deadline) await tick(5);
@@ -57,7 +57,7 @@ test('page recorder is registered only while recording is enabled', async () => 
   await tick();
   assert.equal(scripting.registered.length, 0);
 
-  // Po zapnutí se recorder doplní do otevřených záložek bez připojeného recorderu.
+  // Switching on adds the recorder to open tabs without a connected recorder.
   await bg.local.set({ settings: { enabled: true, recordBodies: false, bufferMs: 300_000 } });
   await tick();
   assert.equal(scripting.registered.length, 1);

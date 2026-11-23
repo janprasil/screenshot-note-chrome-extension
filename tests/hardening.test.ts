@@ -114,7 +114,7 @@ test('console serializer hides sensitive keys with object values and nested JSON
   const nested = serializeArg({ data: JSON.stringify({ password: 'SECRET1', id: 7 }) });
   assert.doesNotMatch(nested, /SECRET1/);
   assert.match(nested, /"id": 7/);
-  // Řetězec na nejvyšší úrovni projde až redakcí textu.
+  // A top-level string goes through text redaction.
   assert.doesNotMatch(redactSecretsInText(JSON.stringify({ token: { access: 'ACC123' }, list: { tokens: ['X1'] } }), DEFAULT_POLICY), /ACC123|X1/);
 });
 
@@ -129,7 +129,7 @@ test('element names are dropped together with element texts', () => {
   const bundle = buildBundle({
     page,
     entries: [],
-    elements: [{ selector: '#a', tag: 'button', name: 'Smazat účet jan@example.com', text: 'Smazat', rect: { x: 0, y: 0, width: 1, height: 1 }, depth: 1 }],
+    elements: [{ selector: '#a', tag: 'button', name: 'Delete account user@example.com', text: 'Delete', rect: { x: 0, y: 0, width: 1, height: 1 }, depth: 1 }],
     network: [],
     policy: { ...DEFAULT_POLICY, includeElementText: false },
     extensionVersion: '0',
@@ -186,7 +186,7 @@ test('incognito windows are never captured', async () => {
     collect: () => ({ page: { ...page }, entries: [] }),
   });
   await tick();
-  // Fokusované anonymní okno se odmítne, nevybere se místo něj běžné.
+  // A focused incognito window is rejected; a regular one is not picked instead.
   assert.equal((await bg.request({ type: 'capture.request', id: 'inc' })).type, 'capture.error');
   assert.equal((await bg.request({ type: 'capture.request', id: 'inc2', target: { tabId: 1 } })).type, 'capture.error');
 });

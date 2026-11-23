@@ -1,5 +1,5 @@
 // Runs in the page's MAIN world at document_start and reports console, errors and fetch/XHR.
-// Background ho registruje jen při zapnutém nahrávání.
+// The background registers it only while recording is on.
 import { CHANNEL_ACK, CHANNEL_HELLO, CHANNEL_READY, isChannelMessage, type ChannelConfig } from './lib/page-channel.ts';
 import { BODY_TRUNCATED } from './lib/redact.ts';
 import { serializeArg } from './lib/serialize.ts';
@@ -8,7 +8,7 @@ import type { ConsoleLevel, PageEntry } from './lib/types.ts';
 const MAX_QUEUE = 200;
 const MAX_BODY = 256 * 1024;
 const TEXT_TYPES = /(^text\/|json|xml|javascript|x-www-form-urlencoded|graphql)/i;
-// Streamy nemají konec, jejich tělo se nečte.
+// Streams never end, so their body is not read.
 const STREAM_TYPES = /(event-stream|ndjson|jsonl|json-seq|multipart\/x-mixed-replace)/i;
 const BODY_READ_TIMEOUT_MS = 30_000;
 
@@ -18,10 +18,10 @@ function install(): void {
   let recordBodies = false;
   let enabled = true;
   let port: MessagePort | undefined;
-  // Záznamy před navázáním kanálu počkají ve frontě.
+  // Entries wait in a queue until the channel is up.
   const queue: string[] = [];
 
-  // Port přijmeme jen jednou, první handshake přichází od content scriptu.
+  // The port is accepted only once; the first handshake comes from the content script.
   const onHello = (event: MessageEvent) => {
     if (port || !isChannelMessage(event, CHANNEL_HELLO) || !event.ports[0]) return;
     window.removeEventListener('message', onHello);
@@ -36,10 +36,10 @@ function install(): void {
     for (const item of queue.splice(0)) port.postMessage(item);
   };
   window.addEventListener('message', onHello);
-  // Content script mohl běžet dřív a první hello zmeškat.
+  // The content script may have run earlier and missed the first hello.
   window.postMessage({ type: CHANNEL_READY }, '*');
 
-  // Záznam jde jako JSON text, content script ho před parsováním změří.
+  // Entries go as JSON text so the content script can measure them before parsing.
   const emit = (entry: PageEntry) => {
     if (!enabled) return;
     try {
@@ -55,7 +55,7 @@ function install(): void {
   for (const level of levels) {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
-      // Vypnuté nahrávání nesmí stránku zdržovat serializací.
+      // With recording off, the page must not pay for serialization.
       if (enabled) emit({
         kind: 'console',
         time: Date.now(),
@@ -135,7 +135,7 @@ function install(): void {
     const info = meta.get(this);
     const start = Date.now();
     const requestBody = enabled && recordBodies ? bodyText(body ?? undefined) : undefined;
-    // Jeden listener na jedno send(), znovu použitý XHR jinak hlásí staré requesty.
+    // One listener per send(), otherwise a reused XHR reports old requests.
     this.addEventListener('loadend', () => {
       if (!info) return;
       const type = this.getResponseHeader('content-type') ?? '';
@@ -181,17 +181,17 @@ function bodyText(body: unknown): string | undefined {
   return '[binary body]';
 }
 
-// Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
+// A truncated body cannot be redacted reliably, so only a marker is sent.
 function capped(text: string): string {
   return text.length > MAX_BODY ? BODY_TRUNCATED : text;
 }
 
-/** Čte tělo nejvýš do MAX_BODY znaků a pak čtení zruší, celé tělo se do paměti nenačte. */
+/** Reads the body up to MAX_BODY characters and then cancels, so the full body is never loaded. */
 async function readCapped(response: Response): Promise<{ responseBody: string; truncated?: boolean }> {
   const reader = response.body?.getReader();
   if (!reader) return { responseBody: '' };
   const decoder = new TextDecoder();
-  // Zrušení čtení uvolní i čekající read() u pomalé odpovědi.
+  // Cancelling also releases a pending read() of a slow response.
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;

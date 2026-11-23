@@ -2,9 +2,9 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<title>Screenshot Note: test mapy elementů</title>
+<title>Screenshot Note: element map test</title>
 <style>
-  /* Ostré hrany a kontrastní barvy, aby šlo posun o pár pixelů poznat od oka. */
+  /* Sharp edges and high contrast make an offset of a few pixels visible. */
   body { margin: 0; font: 14px -apple-system, sans-serif; background: #fff; }
   header { position: sticky; top: 0; height: 48px; background: #222; color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 12px; }
   header button { height: 28px; }
@@ -22,16 +22,16 @@
 </style>
 </head>
 <body>
-<header><strong>Mapa elementů</strong><button>Uložit</button><button>Zrušit</button><input placeholder="Hledat"></header>
+<header><strong>Element map</strong><button>Save</button><button>Cancel</button><input placeholder="Search"></header>
 <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
 <main>
-  <p>Zkus: zoom 100 % a 125 % (⌘+), Retina i externí displej, okno posunuté a částečně mimo obrazovku, odscrollovaná stránka, sbalený pinch zoom.</p>
+  <p>Try: zoom 100 % and 125 % (⌘+), Retina and an external display, a window moved partly off screen, a scrolled page, pinch zoom.</p>
   <div class="grid">
     <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
     <div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div>
   </div>
-  <div class="nested"><section><p>Vnořený odstavec ve dvou rodičích</p></section></div>
-  <div class="tall"><button>Tlačítko níž na stránce</button></div>
+  <div class="nested"><section><p>Paragraph nested in two parents</p></section></div>
+  <div class="tall"><button>Button further down the page</button></div>
 </main>
 </body>
 </html>

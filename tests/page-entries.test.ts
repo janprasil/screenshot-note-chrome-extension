@@ -28,7 +28,7 @@ test('content script validates page-provided entries', async () => {
   assert.equal(big.status, undefined);
   assert.equal(big.durationMs, 0);
 
-  // Bundle z ošetřených záznamů se postaví bez výjimky.
+  // A bundle from sanitized entries builds without throwing.
   const bundle = buildBundle({ page, entries, network: [], policy: DEFAULT_POLICY, extensionVersion: '0' });
   assert.ok(bundle.har);
 });

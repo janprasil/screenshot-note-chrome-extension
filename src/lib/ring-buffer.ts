@@ -17,17 +17,17 @@ export class RingBuffer<T extends { time: number }> {
 
   push(item: T): void {
     const size = this.sizeOf(item);
-    // Záznam větší než celý limit se nepřijme.
+    // An entry larger than the whole limit is rejected.
     if (size > this.maxSize) return;
     this.items.push(item);
     this.sizes.push(size);
     this.total += size;
     this.trim();
-    // Záznamy starší než okno vůči nejnovějšímu se zahodí hned, ne až při exportu.
+    // Entries older than the window relative to the newest are dropped now, not on export.
     if (this.items.length > 0 && this.items[0].time < item.time - this.maxAgeMs) this.prune(item.time);
   }
 
-  /** Přepočítá velikost záznamu, který se po vložení změnil, a případně uvolní nejstarší. */
+  /** Recomputes the size of an entry that changed after insertion and evicts the oldest if needed. */
   resize(item: T): void {
     const index = this.items.lastIndexOf(item);
     if (index === -1) return;

@@ -14,6 +14,14 @@ test('content script hands the channel to the MAIN script and sends config throu
   assert.deepEqual(content.config.at(-1), { type: 'config', enabled: false, recordBodies: true });
 });
 
+test('handshake survives READY and HELLO crossing in flight', async () => {
+  const content = await loadContent(undefined, { mainFirst: true });
+  assert.equal((await content.status()).connected, true);
+  content.emit({ kind: 'console', time: Date.now(), level: 'log', args: ['after race'], url: 'https://app.example.com/' });
+  const { entries } = await content.collect();
+  assert.equal(entries.at(-1).args[0], 'after race');
+});
+
 test('a page cannot take over the channel once it is connected', async () => {
   const content = await loadContent();
   let stolen: unknown;

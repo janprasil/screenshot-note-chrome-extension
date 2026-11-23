@@ -32,6 +32,9 @@ let settings: RecorderSettings = DEFAULT_SETTINGS;
 let port: MessagePort | undefined;
 // MAIN skript potvrdil port, další handshake se už nepřijme.
 let connected = false;
+// Nabídnuté porty čekají na ACK; MAIN si mohl vzít kterýkoli z nich.
+let pending: MessagePort[] = [];
+const MAX_PENDING = 4;
 
 function onEntry(data: unknown): void {
   if (!settings.enabled || typeof data !== 'string' || data.length > MAX_EVENT_CHARS) return;
@@ -44,16 +47,21 @@ function onEntry(data: unknown): void {
 }
 
 function connect(): void {
-  port?.close();
+  if (pending.length >= MAX_PENDING) return;
   const channel = new MessageChannel();
-  port = channel.port1;
-  port.onmessage = (event: MessageEvent) => {
+  const offered = channel.port1;
+  pending.push(offered);
+  offered.onmessage = (event: MessageEvent) => {
     if (typeof event.data === 'object' && event.data?.type === CHANNEL_ACK) {
+      if (connected) return offered.close();
       connected = true;
+      port = offered;
+      for (const other of pending) if (other !== offered) other.close();
+      pending = [];
       sendConfig();
       return;
     }
-    onEntry(event.data);
+    if (offered === port) onEntry(event.data);
   };
   window.postMessage({ type: CHANNEL_HELLO }, '*', [channel.port2]);
 }

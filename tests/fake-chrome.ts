@@ -189,14 +189,15 @@ class FakeMessageChannel {
 }
 
 /** Načte content.ts s minimálním document a window. */
-export async function loadContent(settings: Record<string, unknown> = { enabled: true, recordBodies: false, bufferMs: 300_000 }) {
+export async function loadContent(settings: Record<string, unknown> = { enabled: true, recordBodies: false, bufferMs: 300_000 }, options: { mainFirst?: boolean } = {}) {
   const fake = installFakeChrome({ settings });
   const document = new EventTarget() as EventTarget & { title: string };
   document.title = 'Page';
   const window = Object.assign(new EventTarget(), { screenX: 0, screenY: 0, outerWidth: 1200, outerHeight: 800, innerWidth: 1200, innerHeight: 700, devicePixelRatio: 2, scrollX: 0, scrollY: 0 }) as any;
   window.top = window;
+  // Zprávy okna se doručují asynchronně jako v prohlížeči.
   window.postMessage = (data: unknown, _origin: string, transfer: MessagePort[] = []) => {
-    window.dispatchEvent(Object.assign(new Event('message'), { data, source: window, ports: transfer }));
+    setTimeout(() => window.dispatchEvent(Object.assign(new Event('message'), { data, source: window, ports: transfer })), 0);
   };
   Object.assign(globalThis, { document, window, location: { href: 'https://app.example.com/' }, MessageChannel: FakeMessageChannel });
   // Simulovaný MAIN skript: převezme port z handshaku a potvrdí ho.
@@ -208,6 +209,8 @@ export async function loadContent(settings: Record<string, unknown> = { enabled:
     mainPort.onmessage = (message) => config.push(message.data);
     mainPort.postMessage({ type: 'screenshot-note:ack' });
   });
+  // MAIN skript ohlásí připravenost dřív, než content script pošle hello; obě zprávy čekají na doručení.
+  if (options.mainFirst) window.postMessage({ type: 'screenshot-note:ready' }, '*');
   await import(`../src/content.ts?instance=${++contentInstance}`);
   await new Promise((resolve) => setTimeout(resolve, 20));
   const emit = (entry: unknown) => mainPort!.postMessage(JSON.stringify(entry));

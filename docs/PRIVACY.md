@@ -92,6 +92,8 @@ zohlednit v MCP nástrojích.
 
 ## Oprávnění rozšíření
 
-`<all_urls>`, `webRequest`, `tabs`, `storage`, `nativeMessaging`. Široká oprávnění
-jsou nutná pro sběr na libovolném webu. Chrome Web Store kvůli nim bude vyžadovat
+`<all_urls>`, `webRequest`, `scripting`, `storage`, `nativeMessaging`. Široká oprávnění
+jsou nutná pro sběr na libovolném webu. `tabs` není potřeba, URL a titulek záložek
+dává `<all_urls>`. `scripting` slouží k registraci MAIN world skriptu jen při
+zapnutém nahrávání a k jeho doplnění do otevřených záložek po zapnutí. Chrome Web Store kvůli nim bude vyžadovat
 odůvodnění a privacy policy.

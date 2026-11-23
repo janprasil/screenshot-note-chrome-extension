@@ -1,46 +1,51 @@
 // Runs in the page's MAIN world at document_start and reports console, errors and fetch/XHR.
+// Background ho registruje jen při zapnutém nahrávání.
+import { CHANNEL_ACK, CHANNEL_HELLO, CHANNEL_READY, isChannelMessage, type ChannelConfig } from './lib/page-channel.ts';
 import { BODY_TRUNCATED } from './lib/redact.ts';
 import { serializeArg } from './lib/serialize.ts';
 import type { ConsoleLevel, PageEntry } from './lib/types.ts';
 
-const ENTRY_EVENT = 'screenshot-note:entry';
-const CONFIG_EVENT = 'screenshot-note:config';
+const MAX_QUEUE = 200;
 const MAX_BODY = 256 * 1024;
 const TEXT_TYPES = /(^text\/|json|xml|javascript|x-www-form-urlencoded|graphql)/i;
 // Streamy nemají konec, jejich tělo se nečte.
 const STREAM_TYPES = /(event-stream|ndjson|jsonl|json-seq|multipart\/x-mixed-replace)/i;
 const BODY_READ_TIMEOUT_MS = 30_000;
 
-declare global {
-  interface Window {
-    __screenshotNoteRecorder?: boolean;
-  }
-}
-
-if (!window.__screenshotNoteRecorder) {
-  window.__screenshotNoteRecorder = true;
-  install();
-}
+install();
 
 function install(): void {
   let recordBodies = false;
   let enabled = true;
+  let port: MessagePort | undefined;
+  // Záznamy před navázáním kanálu počkají ve frontě.
+  const queue: string[] = [];
 
-  document.addEventListener(CONFIG_EVENT, (event) => {
-    try {
-      const config = JSON.parse(String((event as CustomEvent).detail));
-      recordBodies = Boolean(config.recordBodies);
-      enabled = config.enabled !== false;
-    } catch {
-      // Ignore malformed config.
-    }
-  });
+  // Port přijmeme jen jednou, první handshake přichází od content scriptu.
+  const onHello = (event: MessageEvent) => {
+    if (port || !isChannelMessage(event, CHANNEL_HELLO) || !event.ports[0]) return;
+    window.removeEventListener('message', onHello);
+    port = event.ports[0];
+    port.onmessage = (message: MessageEvent<ChannelConfig>) => {
+      if (message.data?.type !== 'config') return;
+      recordBodies = Boolean(message.data.recordBodies);
+      enabled = message.data.enabled !== false;
+      if (!enabled) queue.length = 0;
+    };
+    port.postMessage({ type: CHANNEL_ACK });
+    for (const item of queue.splice(0)) port.postMessage(item);
+  };
+  window.addEventListener('message', onHello);
+  // Content script mohl běžet dřív a první hello zmeškat.
+  window.postMessage({ type: CHANNEL_READY }, '*');
 
-  // Detail is a JSON string because objects do not cross worlds reliably.
+  // Záznam jde jako JSON text, content script ho před parsováním změří.
   const emit = (entry: PageEntry) => {
     if (!enabled) return;
     try {
-      document.dispatchEvent(new CustomEvent(ENTRY_EVENT, { detail: JSON.stringify(entry) }));
+      const text = JSON.stringify(entry);
+      if (port) port.postMessage(text);
+      else if (queue.length < MAX_QUEUE) queue.push(text);
     } catch {
       // Never break the page.
     }

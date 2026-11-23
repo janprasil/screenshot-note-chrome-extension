@@ -11,6 +11,7 @@ The extension keeps a short in-memory buffer per tab. When the Mac app takes a s
 - [Protocol and Mac integration](docs/PROTOCOL.md)
 - [Privacy, redaction and encryption](docs/PRIVACY.md)
 - [Plan](docs/PLAN.md)
+- [Chrome Web Store](docs/STORE.md)
 
 ## Development
 
@@ -20,6 +21,7 @@ Requires Node 23.6 or later.
 npm install
 npm run check      # typecheck, unit tests, build
 npm run watch      # rebuild on change
+npm run package:store  # zip for the Chrome Web Store, without the dev `key`
 ```
 
 Load `dist/` via `chrome://extensions` → Developer mode → Load unpacked. The popup can download the context of the current tab without the Mac app.

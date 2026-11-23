@@ -40,15 +40,14 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     if (custom.has(lower)) return { name, value: REDACTED };
     if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
     if (lower === 'refresh') {
-      // URL je zbytek hlavičky; úvodní uvozovka se oddělí vždy, uzavírací je její poslední výskyt.
+      // Celý zbytek hlavičky se rediguje jako URL, nic za ní neprojde; uvozovky jen na krajích.
       return {
         name,
         value: value.replace(/(url\s*=\s*)(.*)$/is, (_match, prefix: string, rest: string) => {
-          const quote = rest[0] === '"' || rest[0] === "'" ? rest[0] : '';
-          if (!quote) return prefix + redactUrl(rest, policy);
-          const end = rest.lastIndexOf(quote);
-          const url = end > 0 ? rest.slice(1, end) : rest.slice(1);
-          return prefix + quote + redactUrl(url, policy) + (end > 0 ? rest.slice(end) : '');
+          const open = rest[0] === '"' || rest[0] === "'" ? rest[0] : '';
+          const close = open && rest.length > 1 && rest.at(-1) === open ? open : '';
+          const url = rest.slice(open.length, rest.length - close.length);
+          return prefix + open + redactUrl(url, policy) + close;
         }),
       };
     }

@@ -150,6 +150,8 @@ test('quoted Refresh URLs are redacted', async () => {
     "0; url='https://a.example/x?token=SECRET'",
     '0; url="https://user:SECRET@a.example/x',
     '0; url="https://user:SECRET@a.example/x"; extra',
+    "0; url='https://a.example/o'neil?token=SECRET",
+    `0; url="https://a.example/x"?token=SECRET`,
   ]) {
     assert.doesNotMatch(redactHeaders([{ name: 'Refresh', value }], DEFAULT_POLICY)[0].value, /SECRET/);
   }

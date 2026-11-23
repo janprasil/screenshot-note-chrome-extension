@@ -113,7 +113,7 @@ na `windowBounds` s tolerancí 8 bodů; ostatní odpovědi bere jako odmítnutí
   "console": [ ConsoleEntry | ErrorEntry ],
   "har": { "log": { … } },          // HAR 1.2, otevře se v DevTools
   "elements": [ { "selector", "tag", "role?", "name?", "text?", "rect": {x,y,width,height}, "depth" } ],
-  "trimmed": { "bodies", "network", "console", "elements" }  // jen u zmenšeného bundle
+  "trimmed": { "bodies", "network", "console", "elements", "largeBodies?" }  // jen u zmenšeného bundle
 }
 ```
 
@@ -122,11 +122,13 @@ Redakce probíhá v rozšíření ještě před odesláním. Neredigovaná data 
 ### Limity velikosti
 
 - Bundle má pevný strop 16 MiB měřený v UTF-8 bajtech (`MAX_BUNDLE_BYTES` v `src/lib/capture.ts`).
-- Když je větší, rozšíření ho zmenšuje: nejdřív zahodí těla, pak nejstarší záznamy
-  sítě a konzole podle společné časové hranice, a teprve když se nevejde ani bez nich,
-  ubírá elementy. Zmenšený bundle má `trimmed: {bodies, network, console, elements}`
-  (zda se zahodila těla a počty zahozených záznamů) a v `policy` skutečně použité
-  `includeBodies`. `summary` vždy popisuje celá, nezmenšená data.
+- Když je větší, rozšíření ho zmenšuje: nejdřív zahazuje těla od největšího
+  (nahradí je `[body omitted: size limit]`, počet je v `trimmed.largeBodies`),
+  a když to nestačí, zahodí všechna těla. Pak nejstarší záznamy sítě a konzole
+  podle společné časové hranice, a teprve když se nevejde ani bez nich, ubírá
+  elementy. Zmenšený bundle má `trimmed: {bodies, network, console, elements, largeBodies?}`
+  (zda se zahodila všechna těla a počty zahozených záznamů) a v `policy` skutečně
+  použité `includeBodies`. `summary` vždy popisuje celá, nezmenšená data.
 - Když se nevejde ani bez záznamů (např. obří titulek stránky), přijde `capture.error` s kódem `too-large`.
 - Native Messaging (`BridgeWire.swift` v repu `screenshot-note`): bridge skončí na
   zprávě rozšíření → host nad 64 MiB (`inputLimit`), stejný limit má čtení socketu

@@ -1,4 +1,4 @@
-import { isCookieHeader, redactBody, redactHeaders, redactUrl } from './redact.ts';
+import { isCookieHeader, redactBody, redactHeaders, redactUrl, redactUrlsInText } from './redact.ts';
 import type { CapturePolicy, Header, NetworkEntry, PageRequestEntry } from './types.ts';
 
 const MATCH_WINDOW_MS = 3_000;
@@ -132,7 +132,7 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
       redirectURL: headerValue(responseHeaders, 'location') ?? '',
       headersSize: -1,
       bodySize: -1,
-      ...(entry.error ? { _error: entry.error } : {}),
+      ...(entry.error ? { _error: redactUrlsInText(entry.error, policy) } : {}),
     },
     cache: {},
     timings: { send: 0, wait: Math.max(0, time), receive: 0 },
@@ -178,7 +178,7 @@ function pageOnlyEntry(page: PageRequestEntry, pageId: string, policy: CapturePo
       redirectURL: '',
       headersSize: -1,
       bodySize: -1,
-      ...(page.error ? { _error: page.error } : {}),
+      ...(page.error ? { _error: redactUrlsInText(page.error, policy) } : {}),
     },
     cache: {},
     timings: { send: 0, wait: Math.max(0, page.durationMs ?? 0), receive: 0 },

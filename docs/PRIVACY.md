@@ -8,7 +8,8 @@
   service workeru a v `chrome.storage.session`. To je paměťové úložiště, které
   přežije restart workeru, ale ne restart prohlížeče. Na disk se nic nepíše.
 - Buffer je omezený časem (výchozí 5 min), počtem (2000 záznamů stránky, 500
-  requestů na záložku) a velikostí (záznamy stránky nejvýš 8 Mi znaků JSONu).
+  requestů na záložku) a velikostí (záznamy stránky nejvýš 8 Mi znaků JSONu,
+  webRequest záznamy nejvýš 4 Mi znaků na záložku).
   Zavřením záložky se smaže.
 - Záznamy ze stránky se ověřují: neznámé typy a špatné typy polí se zahodí, čas
   se omezí na „teď“, texty se zkrátí (argument konzole 4000 znaků, nejvýš 50
@@ -16,7 +17,9 @@
   delší než 4 Mi znaků se zahodí celá.
 - Těla requestů i odpovědí se nahrávají jen při zapnutém přepínači v popupu.
   Bez něj si rozšíření těla od webRequest ani nevyžádá a content script je
-  zahodí. Odpovědi jen textových typů, nejvýš 256 KiB na odpověď.
+  zahodí. Odpovědi jen textových typů, nejvýš 256 KiB na odpověď; čtení se po
+  limitu nebo po 30 s zruší. Streamy (`text/event-stream`, ndjson) se nečtou.
+  Tělo requestu z webRequest (i formulář) nad 64 KiB se nahradí značkou.
 - webRequest zachytí requesty všech rámců záložky, tedy i iframů jiných domén
   (např. platebních widgetů).
 - Vypnutím přepínače těl se okamžitě smažou všechna uložená těla.
@@ -45,18 +48,22 @@ záložku, jinou záložku si host vyžádat nemůže.
 - [x] Skrýt citlivé query parametry (token, code, key…). Výchozí seznam vždy.
   Stejně se redigují parametry ve fragmentu URL (`#access_token=…`, `#/cesta?token=…`)
   a URL v hlavičkách `Location`, `Referer`, `Origin`, `Content-Location`, `Refresh`
-  i v `redirectURL`. URL ve stack trace a ve zprávách chyb se redigují také.
+  i v `redirectURL`. URL ve stack trace, ve zprávách chyb a v chybách síťových
+  requestů se redigují také.
 - [ ] Přiložit těla requestů a odpovědí. Klíče obsahující `pass`, `secret`,
   `token`, `otp`, `card`, `auth`, `key`, `session`… se skryjí v JSON, formulářích
   i multipart. Oříznutá nebo nerozparsovatelná těla se nahradí značkou
-  `[body omitted: …]`, surový text se nikdy neposílá.
+  `[body omitted: …]`, surový text se nikdy neposílá. JSON vnořený hlouběji než
+  3 úrovně nebo rozbitý vnořený JSON se nahradí značkou `[nested value omitted]`.
   Shoda podle části klíče skryje i nevinné klíče (`author`, `monkey`), to je záměr.
   Hodnoty uvnitř GraphQL dotazu jako textu (`login(password: "…")`) se neredigují.
 - [x] Přiložit mapu elementů. [x] Včetně textů prvků.
 
-Hodnoty polí `password` se do mapy elementů nikdy nedostanou. Argumenty konzole
-se neredigují, protože jejich obsah nelze spolehlivě rozpoznat. Rozhodnutí
-o konzoli je proto jen zapnout, nebo vypnout.
+Hodnoty polí `password` se do mapy elementů nikdy nedostanou. V argumentech
+konzole a ve zprávách chyb se redigují URL, hodnoty `Bearer`/`Basic`/`Token`
+a dvojice `"klíč": hodnota` s citlivým klíčem (stejný seznam jako u těl).
+Volný text bez struktury (`heslo je hunter2`) rozpoznat nejde, rozhodnutí
+o konzoli je proto hlavně zapnout, nebo vypnout.
 
 ## Cloud
 

@@ -8,7 +8,7 @@ const MAX = MAX_BUNDLE_BYTES;
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 
-test('bundle is measured in UTF-8 bytes and trimmed under 16 MiB', async () => {
+test('huge requests stay under 16 MiB and the newest are kept', async () => {
   const bg = await loadBackground({ settings: { enabled: true, recordBodies: false, bufferMs: 300_000 } });
   await tick();
   // Každá URL má 20 000 znaků, ale 40 000 bajtů v UTF-8.
@@ -20,7 +20,7 @@ test('bundle is measured in UTF-8 bytes and trimmed under 16 MiB', async () => {
   assert.equal(reply.type, 'capture.result');
   const size = bytes(reply.bundle);
   assert.ok(size <= MAX, `message is ${size} bytes`);
-  assert.ok(reply.bundle.trimmed?.network > 0);
+  // Omezí je buffer záložky nebo ořez bundle.
   const entries = reply.bundle.har.log.entries;
   assert.ok(entries.length > 0 && entries.length < 500);
   // Zůstanou nejnovější requesty.
@@ -50,10 +50,11 @@ test('trimming drops bodies first, keeps the newest entries and the full summary
 
   const withBody = { ...input, network: [{ ...network[0], requestBody: JSON.stringify({ a: 'b'.repeat(20_000) }) }] , entries: [] };
   const small = bundleBytes(buildFittingBundle({ ...withBody, policy: { ...withBody.policy, includeBodies: false } }));
-  const noBodies = buildFittingBundle(withBody, small + 100)!;
-  assert.equal(noBodies.policy.includeBodies, false);
-  assert.equal(noBodies.trimmed?.bodies, true);
+  const noBodies = buildFittingBundle(withBody, small + 500)!;
+  assert.ok(bundleBytes(noBodies) <= small + 500);
+  assert.equal(noBodies.trimmed?.largeBodies, 1);
   assert.equal(noBodies.trimmed?.network, 0);
+  assert.match(JSON.stringify(noBodies.har), /body omitted: size limit/);
 
   const limit = Math.floor(bundleBytes(buildFittingBundle(input)) / 3);
   const bundle = buildFittingBundle(input, limit)!;
@@ -66,4 +67,32 @@ test('trimming drops bodies first, keeps the newest entries and the full summary
   assert.ok(urls.includes('https://a.example/39'));
   assert.ok(!urls.includes('https://a.example/0'));
   assert.equal(bundle.console.at(-1)?.time, 1_039);
+});
+
+test('trimming drops the largest bodies first and keeps the small ones', () => {
+  const page = { url: 'https://a.example/', title: 'T', userAgent: 'u', language: 'cs', geometry: { screenX: 0, screenY: 0, outerWidth: 1, outerHeight: 1, innerWidth: 1, innerHeight: 1, devicePixelRatio: 1, scrollX: 0, scrollY: 0 } };
+  const entries = [
+    { kind: 'request' as const, time: 1, api: 'fetch' as const, method: 'GET', url: 'https://a.example/big', status: 200, responseType: 'application/json', responseBody: JSON.stringify({ data: 'x'.repeat(50_000) }) },
+    { kind: 'request' as const, time: 2, api: 'fetch' as const, method: 'GET', url: 'https://a.example/small', status: 200, responseType: 'application/json', responseBody: '{"ok":true}' },
+  ];
+  const input = { page, network: [], entries, policy: { ...DEFAULT_POLICY, includeBodies: true }, extensionVersion: '0', now: 0 };
+  const bundle = buildFittingBundle(input, 20_000)!;
+  assert.ok(bundleBytes(bundle) <= 20_000);
+  assert.equal(bundle.policy.includeBodies, true);
+  assert.deepEqual(bundle.trimmed, { bodies: false, network: 0, console: 0, elements: 0, largeBodies: 1 });
+  const texts = (bundle.har as any).log.entries.map((entry: any) => entry.response.content.text);
+  assert.deepEqual(texts, ['[body omitted: size limit]', '{"ok":true}']);
+});
+
+test('network buffer of one tab is capped by size', async () => {
+  const bg = await loadBackground({ settings: { enabled: true, recordBodies: false, bufferMs: 300_000 } });
+  await tick();
+  const path = 'a'.repeat(50_000);
+  for (let index = 0; index < 200; index++) {
+    bg.chrome.webRequest.onBeforeRequest.fire({ requestId: String(index), tabId: 1, url: `https://a.example/${index}/${path}`, method: 'GET', type: 'image', timeStamp: Date.now() });
+  }
+  const reply = await bg.request({ type: 'capture.request', id: '1' });
+  const entries = reply.bundle.har.log.entries;
+  assert.ok(entries.length < 100, `${entries.length} entries`);
+  assert.ok(entries.some((entry: any) => entry.request.url.startsWith('https://a.example/199/')));
 });

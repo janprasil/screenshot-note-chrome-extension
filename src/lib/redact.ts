@@ -125,9 +125,11 @@ export function redactUrlsInText(text: string, policy: CapturePolicy): string {
 
 export const BODY_UNPARSED = '[body omitted: unparsed]';
 export const BODY_TRUNCATED = '[body omitted: truncated]';
+export const BODY_TOO_LARGE = '[body omitted: size limit]';
+export const NESTED_OMITTED = '[nested value omitted]';
 
 // Vlastní značky rozšíření místo těla, ty se posílají beze změny.
-const BODY_MARKERS = new Set(['[binary body]', '[file upload]', '[file]', BODY_UNPARSED, BODY_TRUNCATED]);
+const BODY_MARKERS = new Set(['[binary body]', '[file upload]', '[file]', BODY_UNPARSED, BODY_TRUNCATED, BODY_TOO_LARGE]);
 
 // Klíč těla je citlivý, pokud obsahuje některou z těchto částí.
 const SENSITIVE_BODY_PARTS = ['pass', 'pwd', 'secret', 'token', 'otp', 'cvv', 'card', 'auth', 'key', 'session'];
@@ -151,13 +153,30 @@ export function redactBody(
   if (typeof body !== 'string') return { text: BODY_UNPARSED, truncated: false };
   if (body === BODY_TRUNCATED || truncated) return { text: BODY_TRUNCATED, truncated: true };
   if (BODY_MARKERS.has(body)) return { text: body, truncated: false };
+  const sensitive = sensitiveBodyKey(policy);
+  const text = redactStructured(body, sensitive, typeof mimeType === 'string' ? mimeType.toLowerCase() : '', 0);
+  return text === undefined ? { text: BODY_UNPARSED, truncated: false } : truncate(text, policy.maxBodyBytes);
+}
+
+function sensitiveBodyKey(policy: CapturePolicy): Sensitive {
   const keys = new Set(policy.redactBodyKeys.map((key) => key.toLowerCase()));
-  const sensitive: Sensitive = (key) => {
+  return (key) => {
     const lower = key.toLowerCase();
     return keys.has(lower) || SENSITIVE_BODY_PARTS.some((part) => lower.includes(part));
   };
-  const text = redactStructured(body, sensitive, typeof mimeType === 'string' ? mimeType.toLowerCase() : '', 0);
-  return text === undefined ? { text: BODY_UNPARSED, truncated: false } : truncate(text, policy.maxBodyBytes);
+}
+
+// Dvojice "klíč": "hodnota" nebo "klíč": číslo ve volném textu.
+const TEXT_PAIR = /"((?:[^"\\\n]|\\.){1,128})"(\s*:\s*)("(?:[^"\\\n]|\\.)*"|-?\d[\d.eE+-]*)/g;
+const TEXT_AUTH = /\b(Bearer|Basic|Digest|Token)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
+
+/** Redaguje URL, autorizační hodnoty a citlivé dvojice klíč–hodnota ve volném textu, např. v argumentech konzole. */
+export function redactSecretsInText(text: string, policy: CapturePolicy): string {
+  if (typeof text !== 'string') return text;
+  const sensitive = sensitiveBodyKey(policy);
+  return redactUrlsInText(text, policy)
+    .replace(TEXT_AUTH, (_match, scheme: string) => `${scheme} ${REDACTED}`)
+    .replace(TEXT_PAIR, (match, key: string, separator: string) => (sensitive(key) ? `"${key}"${separator}"${REDACTED}"` : match));
 }
 
 function redactStructured(body: string, sensitive: Sensitive, mimeType: string, depth: number): string | undefined {
@@ -205,15 +224,18 @@ function redactForm(text: string, sensitive: Sensitive, depth: number): string {
     .join('&');
 }
 
-/** Vnořený JSON v hodnotě se rediguje také; vrací undefined, když hodnota JSON není. */
+/**
+ * Vnořený JSON v hodnotě se rediguje také; vrací undefined, když hodnota JSON není.
+ * JSON za limitem zanoření nebo rozbitý JSON s klíči se nahradí značkou, jinak by prošel neredigovaný.
+ */
 function redactNested(value: string, sensitive: Sensitive, depth: number): string | undefined {
-  if (depth >= MAX_NESTING) return undefined;
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return undefined;
+  if (depth >= MAX_NESTING) return NESTED_OMITTED;
   try {
     return JSON.stringify(redactJson(JSON.parse(trimmed), sensitive, depth + 1));
   } catch {
-    return undefined;
+    return /"\s*:/.test(trimmed) ? NESTED_OMITTED : undefined;
   }
 }
 

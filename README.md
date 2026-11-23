@@ -6,7 +6,7 @@ Adds what a screenshot cannot show to Screenshot Note captures from the browser:
 - network traffic as HAR 1.2 (opens in Chrome DevTools),
 - a map of visible page elements with CSS selectors, so an element can be picked and described in the annotation editor.
 
-The extension keeps a short in-memory buffer per tab. When the Mac app takes a screenshot of a browser window, it asks the extension over Native Messaging for the last couple of minutes. Cookies, auth headers and tokens are redacted before data leaves the browser. What is redacted is chosen per folder in the Mac app.
+The extension keeps a short in-memory buffer per tab. When the Mac app takes a screenshot of a browser window, it asks the extension over Native Messaging for the last couple of minutes. Cookies, auth headers and tokens in URLs, headers and bodies are redacted before data leaves the browser. Console arguments are redacted on a best-effort basis (URLs, auth values, sensitive JSON keys). What is redacted is chosen per folder in the Mac app.
 
 - [Protocol and Mac integration](docs/PROTOCOL.md)
 - [Privacy, redaction and encryption](docs/PRIVACY.md)

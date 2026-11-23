@@ -122,4 +122,5 @@ test('URL redaction in text stays linear on hostile input', () => {
   const start = performance.now();
   redactSecretsInText('a.'.repeat(50_000), DEFAULT_POLICY);
   assert.ok(performance.now() - start < 200, 'redaction took too long');
+  assert.doesNotMatch(redactSecretsInText('...https://a.example/?token=SECRET -http://b.example/?token=SECRET2', DEFAULT_POLICY), /SECRET/);
 });

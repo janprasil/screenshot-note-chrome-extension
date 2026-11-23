@@ -120,8 +120,8 @@ function decodeName(name: string): string {
 /** Redaguje všechny absolutní URL nalezené ve volném textu, např. ve stack trace. */
 export function redactUrlsInText(text: string, policy: CapturePolicy): string {
   if (typeof text !== 'string') return text;
-  // Omezené schéma a lookbehind brání kvadratickému běhu na textu typu `a.a.a.…`.
-  return text.replace(/(?<![\w+.-])[a-z][\w+.-]{0,31}:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
+  // Omezená délka schématu brání kvadratickému běhu na textu typu `a.a.a.…`.
+  return text.replace(/\b[a-z][\w+.-]{0,31}:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
 }
 
 export const BODY_UNPARSED = '[body omitted: unparsed]';

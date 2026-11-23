@@ -2,6 +2,8 @@ import { selectorFor, type SelectorNode } from './selector.ts';
 import type { ElementInfo, PageGeometry } from './types.ts';
 
 const MAX_ELEMENTS = 1_500;
+// Strop navštívených uzlů, aby obří DOM nezdržel capture.
+const MAX_VISITED = 50_000;
 const MIN_SIZE = 4;
 const TEXT_LIMIT = 120;
 const INTERESTING = new Set([
@@ -25,7 +27,8 @@ export function collectElements(includeText: boolean): ElementInfo[] {
 
   const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_ELEMENT);
   const depthOf = new Map<Element, number>();
-  for (let node = walker.currentNode as Element | null; node; node = walker.nextNode() as Element | null) {
+  let visited = 0;
+  for (let node = walker.currentNode as Element | null; node && visited++ < MAX_VISITED; node = walker.nextNode() as Element | null) {
     const depth = (node.parentElement ? depthOf.get(node.parentElement) ?? 0 : 0) + 1;
     depthOf.set(node, depth);
     if (result.length >= MAX_ELEMENTS) break;

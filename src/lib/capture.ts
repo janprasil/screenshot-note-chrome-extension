@@ -52,7 +52,8 @@ export function buildBundle(input: BundleInput, summary?: CaptureSummary): Captu
     });
   }
   if (policy.includeElements && input.elements) {
-    bundle.elements = policy.includeElementText ? input.elements : input.elements.map(({ text: _text, ...rest }) => rest);
+    // Přístupné jméno je také text stránky, bez textů se vynechá i ono.
+    bundle.elements = policy.includeElementText ? input.elements : input.elements.map(({ text: _text, name: _name, ...rest }) => rest);
   }
   return bundle;
 }

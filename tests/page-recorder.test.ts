@@ -4,18 +4,26 @@ import { loadBackground, loadContent } from './fake-chrome.ts';
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Čeká na podmínku místo pevné pauzy, zprávy přes porty jsou asynchronní. */
+async function until(check: () => boolean, timeoutMs = 1_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!check() && Date.now() < deadline) await tick(5);
+}
+
 test('content script hands the channel to the MAIN script and sends config through it', async () => {
   const content = await loadContent({ enabled: true, recordBodies: true, bufferMs: 300_000 });
+  await until(() => content.config.length > 0);
   assert.deepEqual((await content.status()).connected, true);
   assert.deepEqual(content.config.at(-1), { type: 'config', enabled: true, recordBodies: true });
 
   await content.local.set({ settings: { enabled: false, recordBodies: true, bufferMs: 300_000 } });
-  await tick();
+  await until(() => content.config.at(-1)?.enabled === false);
   assert.deepEqual(content.config.at(-1), { type: 'config', enabled: false, recordBodies: true });
 });
 
 test('handshake survives READY and HELLO crossing in flight', async () => {
   const content = await loadContent(undefined, { mainFirst: true });
+  await until(() => content.config.length > 0);
   assert.equal((await content.status()).connected, true);
   content.emit({ kind: 'console', time: Date.now(), level: 'log', args: ['after race'], url: 'https://app.example.com/' });
   const { entries } = await content.collect();

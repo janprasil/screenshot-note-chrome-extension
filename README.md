@@ -31,6 +31,7 @@ Load `dist/` via `chrome://extensions` → Developer mode → Load unpacked. The
 ```sh
 ./dev-host/install.sh <extension-id>     # ID from chrome://extensions
 # Reload the extension, the popup should show "Connected".
+# host.pid exists only while the host runs, so the signal never hits another process.
 kill -USR1 "$(cat ~/Downloads/screenshot-note-dev/host.pid)"
 ls ~/Downloads/screenshot-note-dev       # capture-*.json and capture-*.har
 ```

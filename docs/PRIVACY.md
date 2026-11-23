@@ -24,6 +24,11 @@
   (např. platebních widgetů).
 - Vypnutím přepínače těl se okamžitě smažou všechna uložená těla.
 - Vypnutím nahrávání se okamžitě smažou všechny buffery.
+- Záznamy starší než nastavené okno se zahodí při dalším záznamu v záložce
+  a po probuzení service workeru i ze session úložiště. Nečinná záložka je
+  drží v paměti, dokud se worker neuspí.
+- Anonymní okna se nikdy neexportují, ani když uživatel rozšíření v anonymním
+  režimu povolí.
 
 ## Redakce
 
@@ -57,7 +62,8 @@ záložku, jinou záložku si host vyžádat nemůže.
   3 úrovně nebo rozbitý vnořený JSON se nahradí značkou `[nested value omitted]`.
   Shoda podle části klíče skryje i nevinné klíče (`author`, `monkey`), to je záměr.
   Hodnoty uvnitř GraphQL dotazu jako textu (`login(password: "…")`) se neredigují.
-- [x] Přiložit mapu elementů. [x] Včetně textů prvků.
+- [x] Přiložit mapu elementů. [x] Včetně textů prvků. Bez textů se vynechá
+  i přístupné jméno prvku (`aria-label`, `title`, `alt`, `placeholder`).
 
 Hodnoty polí `password` se do mapy elementů nikdy nedostanou. Objekty v argumentech
 konzole skryjí hodnoty citlivých klíčů už ve stránce (i objekty a pole, i JSON

@@ -30,9 +30,13 @@ const ready = (async () => {
   const saved = await chrome.storage.session.get(null);
   for (const [key, value] of Object.entries(saved)) {
     if (!key.startsWith('net:')) continue;
-    const state = tabState(Number(key.slice(4)));
+    const tabId = Number(key.slice(4));
+    const state = tabState(tabId);
     state.buffer.replace(value as Stored[]);
+    // Po probuzení workeru se prošlé záznamy zahodí i ze session.
+    state.buffer.prune();
     for (const entry of state.buffer.toArray()) state.byId.set(entry.requestId, entry);
+    markDirty(tabId);
   }
   if (!settings.recordBodies) clearBodies();
 })();
@@ -294,7 +298,13 @@ export interface CaptureTarget {
   tabId?: number;
 }
 
+/** Cílová záložka; anonymní se odmítne, nikdy se nenahradí jinou. */
 async function findTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
+  const tab = await pickTab(input);
+  return tab?.incognito ? undefined : tab;
+}
+
+async function pickTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
   let target = parseTarget(input);
   const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal', 'popup', 'app'] });
   const activeTab = (window: chrome.windows.Window) => window.tabs?.find((tab) => tab.active);

@@ -1,3 +1,4 @@
+import { pairPageRequests } from './har.ts';
 import { redactUrl, redactUrlsInText } from './redact.ts';
 import type { CapturePolicy, CaptureSummary, ConsoleEntry, ErrorEntry, NetworkEntry, PageRequestEntry } from './types.ts';
 
@@ -27,6 +28,7 @@ export function summarize(
     consoleWarnings: logs.filter((entry) => entry.kind === 'console' && entry.level === 'warn').length,
     uncaughtErrors: logs.filter((entry) => entry.kind === 'error').length,
     failedRequests: failed.slice(-MAX_FAILED),
-    requestCount: network.length,
+    // Požadavky jen ze záznamu stránky (např. obsloužené service workerem) se počítají také.
+    requestCount: network.length + pageRequests.length - pairPageRequests(network, pageRequests).size,
   };
 }

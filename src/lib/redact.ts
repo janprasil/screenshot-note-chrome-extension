@@ -40,8 +40,15 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     if (custom.has(lower)) return { name, value: REDACTED };
     if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
     if (lower === 'refresh') {
-      // URL může být v uvozovkách, ty se při redakci zachovají.
-      return { name, value: value.replace(/(url\s*=\s*)(["']?)([^"'\s]+)/i, (_match, prefix: string, quote: string, url: string) => prefix + quote + redactUrl(url, policy)) };
+      // URL je zbytek hlavičky; uvozovky se odstraní, jen když ji obalují z obou stran.
+      return {
+        name,
+        value: value.replace(/(url\s*=\s*)(.*)$/is, (_match, prefix: string, rest: string) => {
+          const quote = rest.length > 1 && (rest[0] === '"' || rest[0] === "'") && rest.at(-1) === rest[0] ? rest[0] : '';
+          const url = quote ? rest.slice(1, -1) : rest;
+          return prefix + quote + redactUrl(url, policy) + quote;
+        }),
+      };
     }
     return { name, value };
   });

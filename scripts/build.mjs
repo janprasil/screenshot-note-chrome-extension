@@ -19,6 +19,7 @@ const configs = [
 
 await cp('src/manifest.json', `${out}/manifest.json`);
 await cp('src/_locales', `${out}/_locales`, { recursive: true });
+await cp('src/icons', `${out}/icons`, { recursive: true });
 await cp('src/popup/popup.html', `${out}/popup.html`);
 await cp('src/popup/popup.css', `${out}/popup.css`);
 

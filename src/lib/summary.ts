@@ -1,4 +1,4 @@
-import { redactUrl } from './redact.ts';
+import { redactUrl, redactUrlsInText } from './redact.ts';
 import type { CapturePolicy, CaptureSummary, ConsoleEntry, ErrorEntry, NetworkEntry, PageRequestEntry } from './types.ts';
 
 const MAX_FAILED = 20;
@@ -12,14 +12,14 @@ export function summarize(
   const failed: CaptureSummary['failedRequests'] = [];
   for (const entry of network) {
     if ((entry.statusCode ?? 0) >= 400 || entry.error) {
-      failed.push({ method: entry.method, url: redactUrl(entry.url, policy), status: entry.statusCode, error: entry.error });
+      failed.push({ method: entry.method, url: redactUrl(entry.url, policy), status: entry.statusCode, error: entry.error && redactUrlsInText(entry.error, policy) });
     }
   }
   const seen = new Set(network.map((entry) => `${entry.method} ${entry.url}`));
   for (const entry of pageRequests) {
     if (seen.has(`${entry.method} ${entry.url}`)) continue;
     if ((entry.status ?? 0) >= 400 || entry.error) {
-      failed.push({ method: entry.method, url: redactUrl(entry.url, policy), status: entry.status, error: entry.error });
+      failed.push({ method: entry.method, url: redactUrl(entry.url, policy), status: entry.status, error: entry.error && redactUrlsInText(entry.error, policy) });
     }
   }
   return {

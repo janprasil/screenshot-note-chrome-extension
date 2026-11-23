@@ -1,4 +1,4 @@
-import { isCookieHeader, redactBody, redactHeaders, redactUrl } from './redact.ts';
+import { isCookieHeader, redactBody, redactHeaders, redactUrl, redactUrlsInText } from './redact.ts';
 import type { CapturePolicy, Header, NetworkEntry, PageRequestEntry } from './types.ts';
 
 const MATCH_WINDOW_MS = 3_000;
@@ -62,6 +62,17 @@ export function buildHar(input: HarInput): unknown {
       entries,
     },
   };
+}
+
+/** Párování webRequest záznamů se záznamy stránky stejně jako v HARu. */
+export function pairPageRequests(network: NetworkEntry[], pages: PageRequestEntry[]): Map<NetworkEntry, PageRequestEntry> {
+  const used = new Set<PageRequestEntry>();
+  const pairs = new Map<NetworkEntry, PageRequestEntry>();
+  for (const entry of network.slice().sort((a, b) => a.startTime - b.startTime)) {
+    const page = matchPageRequest(entry, pages, used);
+    if (page) pairs.set(entry, page);
+  }
+  return pairs;
 }
 
 function matchPageRequest(entry: NetworkEntry, pages: PageRequestEntry[], used: Set<PageRequestEntry>) {
@@ -132,7 +143,7 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
       redirectURL: headerValue(responseHeaders, 'location') ?? '',
       headersSize: -1,
       bodySize: -1,
-      ...(entry.error ? { _error: entry.error } : {}),
+      ...(entry.error ? { _error: redactUrlsInText(entry.error, policy) } : {}),
     },
     cache: {},
     timings: { send: 0, wait: Math.max(0, time), receive: 0 },
@@ -178,7 +189,7 @@ function pageOnlyEntry(page: PageRequestEntry, pageId: string, policy: CapturePo
       redirectURL: '',
       headersSize: -1,
       bodySize: -1,
-      ...(page.error ? { _error: page.error } : {}),
+      ...(page.error ? { _error: redactUrlsInText(page.error, policy) } : {}),
     },
     cache: {},
     timings: { send: 0, wait: Math.max(0, page.durationMs ?? 0), receive: 0 },

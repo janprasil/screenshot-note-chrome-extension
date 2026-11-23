@@ -7,6 +7,9 @@ const ENTRY_EVENT = 'screenshot-note:entry';
 const CONFIG_EVENT = 'screenshot-note:config';
 const MAX_BODY = 256 * 1024;
 const TEXT_TYPES = /(^text\/|json|xml|javascript|x-www-form-urlencoded|graphql)/i;
+// Streamy nemají konec, jejich tělo se nečte.
+const STREAM_TYPES = /(event-stream|ndjson|jsonl|json-seq|multipart\/x-mixed-replace)/i;
+const BODY_READ_TIMEOUT_MS = 30_000;
 
 declare global {
   interface Window {
@@ -47,7 +50,8 @@ function install(): void {
   for (const level of levels) {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
-      emit({
+      // Vypnuté nahrávání nesmí stránku zdržovat serializací.
+      if (enabled) emit({
         kind: 'console',
         time: Date.now(),
         level,
@@ -86,22 +90,22 @@ function install(): void {
     });
   });
 
+  const wantsBody = (type: string) => enabled && recordBodies && TEXT_TYPES.test(type) && !STREAM_TYPES.test(type);
+
   const originalFetch = window.fetch;
   window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
     const start = Date.now();
     const request = input instanceof Request ? input : undefined;
     const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
     const url = absoluteUrl(request ? request.url : String(input));
-    const requestBody = recordBodies ? bodyText(init?.body) : undefined;
+    const requestBody = enabled && recordBodies ? bodyText(init?.body) : undefined;
     try {
       const response = await originalFetch.call(this, input, init);
       const base = { kind: 'request' as const, time: start, api: 'fetch' as const, method, url, status: response.status, durationMs: Date.now() - start, requestBody };
       const type = response.headers.get('content-type') ?? '';
-      if (recordBodies && TEXT_TYPES.test(type)) {
-        response
-          .clone()
-          .text()
-          .then((text) => emit({ ...base, responseType: type, ...limit(text) }))
+      if (wantsBody(type)) {
+        readCapped(response.clone())
+          .then((body) => emit({ ...base, responseType: type, ...body }))
           .catch(() => emit({ ...base, responseType: type }));
       } else {
         emit({ ...base, responseType: type });
@@ -125,12 +129,13 @@ function install(): void {
   XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
     const info = meta.get(this);
     const start = Date.now();
-    const requestBody = recordBodies ? bodyText(body ?? undefined) : undefined;
+    const requestBody = enabled && recordBodies ? bodyText(body ?? undefined) : undefined;
+    // Jeden listener na jedno send(), znovu použitý XHR jinak hlásí staré requesty.
     this.addEventListener('loadend', () => {
       if (!info) return;
       const type = this.getResponseHeader('content-type') ?? '';
       let responseBody: { responseBody?: string; truncated?: boolean } = {};
-      if (recordBodies && TEXT_TYPES.test(type) && (this.responseType === '' || this.responseType === 'text')) {
+      if (wantsBody(type) && (this.responseType === '' || this.responseType === 'text')) {
         responseBody = limit(this.responseText);
       }
       emit({
@@ -146,7 +151,7 @@ function install(): void {
         error: this.status === 0 ? 'network error or aborted' : undefined,
         ...responseBody,
       });
-    });
+    }, { once: true });
     return send.call(this, body);
   };
 }
@@ -174,6 +179,35 @@ function bodyText(body: unknown): string | undefined {
 // Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
 function capped(text: string): string {
   return text.length > MAX_BODY ? BODY_TRUNCATED : text;
+}
+
+/** Čte tělo nejvýš do MAX_BODY znaků a pak čtení zruší, celé tělo se do paměti nenačte. */
+async function readCapped(response: Response): Promise<{ responseBody: string; truncated?: boolean }> {
+  const reader = response.body?.getReader();
+  if (!reader) return { responseBody: '' };
+  const decoder = new TextDecoder();
+  // Zrušení čtení uvolní i čekající read() u pomalé odpovědi.
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => undefined);
+  }, BODY_READ_TIMEOUT_MS);
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      if (text.length > MAX_BODY) {
+        void reader.cancel().catch(() => undefined);
+        return { responseBody: text.slice(0, MAX_BODY), truncated: true };
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+  if (timedOut) return { responseBody: text.slice(0, MAX_BODY), truncated: true };
+  return limit(text + decoder.decode());
 }
 
 function limit(text: string): { responseBody: string; truncated?: boolean } {

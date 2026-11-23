@@ -25,6 +25,20 @@ export class RingBuffer<T extends { time: number }> {
     this.trim();
   }
 
+  /** Přepočítá velikost záznamu, který se po vložení změnil, a případně uvolní nejstarší. */
+  resize(item: T): void {
+    const index = this.items.lastIndexOf(item);
+    if (index === -1) return;
+    const size = this.sizeOf(item);
+    this.total += size - this.sizes[index];
+    this.sizes[index] = size;
+    if (size > this.maxSize) {
+      this.items.splice(index, 1);
+      this.total -= this.sizes.splice(index, 1)[0];
+    }
+    this.trim();
+  }
+
   prune(now = Date.now()): void {
     const cutoff = now - this.maxAgeMs;
     const index = this.items.findIndex((item) => item.time >= cutoff);

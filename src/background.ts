@@ -10,6 +10,8 @@ type Stored = NetworkEntry & { time: number };
 
 const MAX_PER_TAB = 500;
 const MAX_REQUEST_BODY = 64 * 1024;
+// Strop záznamů jedné záložky ve znacích, počet záznamů paměť neomezí.
+const MAX_TAB_CHARS = 4 * 1024 * 1024;
 const extensionVersion = chrome.runtime.getManifest().version;
 
 // Do načtení nastavení se nic nenahrává, uživatel mohl nahrávání vypnout.
@@ -49,10 +51,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
 function tabState(tabId: number) {
   let state = tabs.get(tabId);
   if (!state) {
-    state = { buffer: new RingBuffer<Stored>(MAX_PER_TAB, settings.bufferMs), byId: new Map() };
+    state = { buffer: new RingBuffer<Stored>(MAX_PER_TAB, settings.bufferMs, MAX_TAB_CHARS, storedSize), byId: new Map() };
     tabs.set(tabId, state);
   }
   return state;
+}
+
+/** Přibližná velikost záznamu ve znacích. */
+function storedSize(entry: Stored): number {
+  let size = 200 + entry.url.length + (entry.requestBody?.length ?? 0) + (entry.error?.length ?? 0);
+  for (const header of [...(entry.requestHeaders ?? []), ...(entry.responseHeaders ?? [])]) size += header.name.length + header.value.length;
+  return size;
+}
+
+/** Záznam se po vložení změnil, přepočítá se jeho velikost a uloží se. */
+function changed(tabId: number, entry: Stored): void {
+  tabs.get(tabId)?.buffer.resize(entry);
+  markDirty(tabId);
 }
 
 function markDirty(tabId: number): void {
@@ -129,7 +144,7 @@ function onRequestBody(details: chrome.webRequest.WebRequestBodyDetails): void {
   const entry = tabs.get(details.tabId)?.byId.get(details.requestId);
   if (entry) {
     entry.requestBody = body;
-    markDirty(details.tabId);
+    changed(details.tabId, entry);
     return;
   }
   // Pořadí listenerů není zaručené, hlavní listener si tělo vyzvedne.
@@ -150,6 +165,7 @@ function clearBodies(): void {
     for (const entry of state.buffer.toArray()) {
       if (entry.requestBody === undefined) continue;
       delete entry.requestBody;
+      state.buffer.resize(entry);
       dirty.add(tabId);
       found = true;
     }
@@ -167,7 +183,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     const entry = entryFor(details);
     if (!entry) return;
     entry.requestHeaders = headers(details.requestHeaders);
-    markDirty(details.tabId);
+    changed(details.tabId, entry);
   },
   filter,
   ['requestHeaders', 'extraHeaders'],
@@ -180,7 +196,7 @@ chrome.webRequest.onHeadersReceived.addListener(
     entry.statusCode = details.statusCode;
     entry.statusLine = details.statusLine;
     entry.responseHeaders = headers(details.responseHeaders);
-    markDirty(details.tabId);
+    changed(details.tabId, entry);
   },
   filter,
   ['responseHeaders', 'extraHeaders'],
@@ -205,7 +221,7 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
   if (!entry) return;
   entry.endTime = details.timeStamp;
   entry.error = details.error;
-  markDirty(details.tabId);
+  changed(details.tabId, entry);
 }, filter);
 
 function headers(list: chrome.webRequest.HttpHeader[] | undefined): Header[] | undefined {
@@ -215,9 +231,18 @@ function headers(list: chrome.webRequest.HttpHeader[] | undefined): Header[] | u
 function requestBodyText(body: chrome.webRequest.WebRequestBody | null | undefined): string | undefined {
   if (!body) return undefined;
   if (body.formData) {
-    return Object.entries(body.formData)
-      .flatMap(([key, values]) => values.map((value) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`))
-      .join('&');
+    // Formulář se skládá postupně, aby obří pole neprošlo přes limit.
+    const fields: string[] = [];
+    let length = 0;
+    for (const [key, values] of Object.entries(body.formData)) {
+      for (const value of values) {
+        const field = `${encodeURIComponent(key)}=${encodeURIComponent(String(value).slice(0, MAX_REQUEST_BODY + 1))}`;
+        length += field.length + 1;
+        if (length > MAX_REQUEST_BODY) return BODY_TRUNCATED;
+        fields.push(field);
+      }
+    }
+    return fields.join('&');
   }
   if (body.raw && body.raw.length > 1) return body.raw.some((part) => part.file) ? '[file upload]' : BODY_TRUNCATED;
   const bytes = body.raw?.find((part) => part.bytes)?.bytes;

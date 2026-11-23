@@ -11,7 +11,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 test('huge requests stay under 16 MiB and the newest are kept', async () => {
   const bg = await loadBackground({ settings: { enabled: true, recordBodies: false, bufferMs: 300_000 } });
   await tick();
-  // Každá URL má 20 000 znaků, ale 40 000 bajtů v UTF-8.
+  // Each URL has 20 000 characters but 40 000 bytes in UTF-8.
   const path = 'ě'.repeat(20_000);
   for (let index = 0; index < 500; index++) {
     bg.chrome.webRequest.onBeforeRequest.fire({ requestId: String(index), tabId: 1, url: `https://a.example/${index}/${path}`, method: 'GET', type: 'image', timeStamp: Date.now() });
@@ -20,10 +20,10 @@ test('huge requests stay under 16 MiB and the newest are kept', async () => {
   assert.equal(reply.type, 'capture.result');
   const size = bytes(reply.bundle);
   assert.ok(size <= MAX, `message is ${size} bytes`);
-  // Omezí je buffer záložky nebo ořez bundle.
+  // The tab buffer or bundle trimming limits them.
   const entries = reply.bundle.har.log.entries;
   assert.ok(entries.length > 0 && entries.length < 500);
-  // Zůstanou nejnovější requesty.
+  // The newest requests stay.
   assert.ok(entries.some((entry: any) => entry.request.url.startsWith('https://a.example/499/')));
 });
 

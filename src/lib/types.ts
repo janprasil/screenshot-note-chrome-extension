@@ -138,7 +138,7 @@ export interface CaptureBundle {
   console: (ConsoleEntry | ErrorEntry)[];
   har?: unknown;
   elements?: ElementInfo[];
-  /** Jen u bundle zmenšeného kvůli velikosti: zda se zahodila těla a kolik záznamů. */
+  /** Only for a bundle reduced for size: whether bodies were dropped and how many entries. */
   trimmed?: { bodies: boolean; network: number; console: number; elements: number; largeBodies?: number };
 }
 

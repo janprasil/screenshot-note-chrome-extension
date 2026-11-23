@@ -1,105 +1,90 @@
-# Protokol rozšíření ↔ Screenshot Note (v1)
+# Extension ↔ Screenshot Note protocol (v1)
 
-Kontrakt mezi tímto rozšířením a macOS aplikací `screenshot-note`. Rozšíření je
-hotové podle tohoto dokumentu, Mac strana (bridge, poskytovatel kontextu, anotace
-elementu) zatím chybí.
+Contract between this extension and the Screenshot Note macOS app. How the app stores and syncs the context is described in `docs/BROWSER-CONTEXT.md` of the `screenshot-note` repository.
 
-## Architektura
+## Architecture
 
 ```text
 Chrome tab ──(MAIN world: inject.js)── console, errors, fetch/XHR
      │                                     │ MessageChannel (JSON text)
      └─(isolated: content.js) ring buffer ◄┘, element map, geometry
                 │ chrome.tabs.sendMessage
-background.js ── webRequest ring buffer per tab, redakce, HAR, bundle
-                │ Native Messaging (stdio, 4B LE délka + JSON)
-screenshot-note-bridge (helper v bundlu appky)
+background.js ── webRequest ring buffer per tab, redaction, HAR, bundle
+                │ Native Messaging (stdio, 4-byte LE length + JSON)
+screenshot-note-bridge (helper inside the app bundle)
                 │ Unix socket ~/Library/Application Support/Screenshot Note/bridge.sock
-Screenshot Note.app ── ContextProvider → přílohy ke snímku
+Screenshot Note.app ── attaches the context to the screenshot
 ```
 
-- Native Messaging umí spojení navázat jen rozšíření. Proto se rozšíření připojí
-  hned při startu a spojení drží. Otevřený port zároveň drží service worker naživu.
-- Bridge musí běžet, i když appka neběží. Na socket appky se připojuje znovu
-  každé 2 s. Pokud skončí, rozšíření se připojí znovu s backoffem 5 s → 5 min.
+- Only the extension can open a Native Messaging connection. It therefore connects on startup and keeps the port open. The open port also keeps the service worker alive.
+- The bridge must run even when the app is not running. It reconnects to the app socket every 2 s. If the bridge exits, the extension reconnects with a backoff from 5 s to 5 min.
 
-## Registrace hostu
+## Host registration
 
-- Název: `cz.janprasil.screenshotnote.bridge`.
-- Manifest `<název>.json` instaluje appka (při zapnutí funkce) do:
+- Name: `cz.janprasil.screenshotnote.bridge`.
+- The app installs the manifest `<name>.json` (when the feature is switched on) into:
   - Chrome: `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`
   - Chrome Beta/Canary: `…/Google/Chrome Beta|Chrome Canary/NativeMessagingHosts/`
   - Edge: `~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/`
   - Brave: `~/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/`
   - Arc: `~/Library/Application Support/Arc/User Data/NativeMessagingHosts/`
   - Chromium: `~/Library/Application Support/Chromium/NativeMessagingHosts/`
-  - Zapisuje se jen tam, kde adresář prohlížeče v Application Support existuje.
-- `allowed_origins` obsahuje jen ID rozšíření z Chrome Web Store a ID vývojového buildu.
-- ID vývojového buildu: `hffkngdjiopodemokmgiedickoiehidb` (pevné díky `key` v `src/manifest.json`).
-  Privátní klíč je mimo repo v `~/.config/screenshot-note/chrome-extension-dev.pem`. ID z Chrome Web Store zatím není.
-- `path` míří na `Screenshot Note.app/Contents/MacOS/screenshot-note-bridge`. Po přesunutí appky se manifest přepíše.
-- Pro vývoj existuje `dev-host/` (viz README).
+  - It writes only where the browser's Application Support directory exists.
+- `allowed_origins` contains only the Chrome Web Store extension ID and the development build ID.
+- Development build ID: `hffkngdjiopodemokmgiedickoiehidb` (fixed by `key` in `src/manifest.json`; the private key is not in the repository).
+- `path` points to `Screenshot Note.app/Contents/MacOS/screenshot-note-bridge`. The manifest is rewritten when the app moves.
+- `dev-host/` provides a host for development (see README).
 
-## Zprávy
+## Messages
 
-Rozšíření → host:
+Extension → host:
 
-| type | pole | význam |
+| type | fields | meaning |
 |---|---|---|
-| `hello` | `protocol`, `extensionVersion`, `browser` | posílá se po připojení |
-| `pong` | `id`, `protocol`, `enabled` | odpověď na `ping` |
-| `capture.result` | `id`, `bundle` | výsledek, formát viz níže |
+| `hello` | `protocol`, `extensionVersion`, `browser` | sent after connecting |
+| `pong` | `id`, `protocol`, `enabled` | reply to `ping` |
+| `capture.result` | `id`, `bundle` | result, format below |
 | `capture.error` | `id`, `code`, `message` | `disabled`, `no-tab`, `too-large`, `internal` |
 
-Host → rozšíření:
+Host → extension:
 
-| type | pole | význam |
+| type | fields | meaning |
 |---|---|---|
-| `hello` | `protocol`, `app?: {version, running}` | potvrzení spojení |
-| `ping` | `id` | kontrola dostupnosti |
-| `capture.request` | `id`, `policy?`, `target?` | žádost o kontext |
+| `hello` | `protocol`, `app?: {version, running}` | confirms the connection |
+| `ping` | `id` | availability check |
+| `capture.request` | `id`, `policy?`, `target?` | asks for context |
 
-`target` (vše volitelné):
-- `windowBounds: {x, y, width, height}`: okno prohlížeče z `CGWindowListCopyWindowInfo` v bodech, počátek vlevo nahoře. Rozšíření ho porovná s `chrome.windows` s tolerancí 8 bodů.
-- `windowTitle`: záložní shoda podle titulku aktivní záložky.
-- `tabId`: přímé určení (rezerva). Platí jen pro aktivní záložku některého okna. Jinak se celý `target` ignoruje.
-- Bez shody se použije naposledy fokusované okno.
+`target` (all optional):
+- `windowBounds: {x, y, width, height}`: the browser window from `CGWindowListCopyWindowInfo` in points, origin top left. The extension matches it against `chrome.windows` with a tolerance of 8 points.
+- `windowTitle`: fallback match on the title of the active tab.
+- `tabId`: direct choice (reserve). Accepted only for the active tab of a window. Otherwise the whole `target` is ignored.
+- Without a match, the last focused window is used.
 
-`policy` (`CapturePolicy`) nastavuje Mac appka podle složky nebo konfigurace. Chybějící pole doplní výchozí hodnoty (`src/lib/defaults.ts`).
-Mac appka posílá `includeConsole`, `includeNetwork`, `includeBodies`, `includeElements`, `includeElementText`, `redactCookies`/`redactAuthHeaders` (vždy `true`), `redactHeaders` a `redactQueryParams` z nastavení lokální složky. Složka s vypnutým kontextem a cloudová složka `capture.request` vůbec nepošlou.
-Policy může redakci jen přidat, nikdy ubrat:
-- `redactCookies` a `redactAuthHeaders` jsou vždy `true`, bez ohledu na hodnotu od hostu.
-- Seznamy `redactHeaders`, `redactQueryParams` a `redactBodyKeys` od hostu se přidají k výchozím.
-- `includeBodies` platí, jen když má uživatel v popupu zapnuté nahrávání těl.
-- Pole se špatným typem se ignorují a použije se výchozí hodnota.
-- V bundle je v `policy` to, co se skutečně použilo.
+`policy` (`CapturePolicy`) is set by the app. Missing fields get the defaults from `src/lib/defaults.ts`. The policy can only add redaction, never remove it:
+- `redactCookies` and `redactAuthHeaders` are always `true`, whatever the host sends.
+- `redactHeaders`, `redactQueryParams` and `redactBodyKeys` from the host are added to the defaults.
+- `includeBodies` applies only while the user has body recording switched on in the popup.
+- Fields with a wrong type are ignored and the default is used.
+- The bundle's `policy` holds what was actually applied.
 
-| pole | výchozí | |
+| field | default | |
 |---|---|---|
 | `includeConsole` / `includeNetwork` / `includeElements` | `true` | |
-| `includeBodies` | `false` | jen při zapnutém přepínači těl v popupu |
-| `includeElementText` | `true` | texty prvků v mapě elementů |
-| `redactCookies` | `true` | vždy zapnuto; jména cookies zůstanou, hodnoty se skryjí |
-| `redactAuthHeaders` | `true` | vždy zapnuto; `Authorization`, `X-Api-Key`, CSRF… a každá hlavička, jejíž jméno odpovídá vzoru `SENSITIVE_NAME_PATTERN` v `src/lib/defaults.ts` (`token`, `secret`, `key`, `auth`, `session`…), kromě `Keep-Alive`, `Access-Control-Allow-Credentials`, `WWW-Authenticate`, `Proxy-Authenticate`; schéma (`Bearer`) zůstane |
-| `redactHeaders` | `[]` | vlastní hlavičky ke skrytí, přidají se |
-| `redactQueryParams` | token, code, key, jwt, sid… | přidají se k výchozím; navíc každý parametr se jménem podle stejného vzoru jako u hlaviček; platí i pro fragment URL a hlavičky `Location`, `Referer`, `Origin`, `Content-Location` |
-| `redactBodyKeys` | password, token… | přidají se k výchozím; navíc vždy klíče obsahující `pass`, `pwd`, `secret`, `token`, `otp`, `cvv`, `card`, `auth`, `key`, `session` (bez ohledu na velikost písmen) |
+| `includeBodies` | `false` | only with the popup body switch on |
+| `includeElementText` | `true` | element texts in the element map |
+| `redactCookies` | `true` | always on; cookie names stay, values are hidden |
+| `redactAuthHeaders` | `true` | always on; `Authorization`, `X-Api-Key`, CSRF and every header whose name matches `SENSITIVE_NAME_PATTERN` in `src/lib/defaults.ts` (`token`, `secret`, `key`, `auth`, `session`…), except `Keep-Alive`, `Access-Control-Allow-Credentials`, `WWW-Authenticate`, `Proxy-Authenticate`; the scheme (`Bearer`) stays |
+| `redactHeaders` | `[]` | extra headers to hide, added |
+| `redactQueryParams` | token, code, key, jwt, sid… | added to the defaults; plus every parameter whose name matches the header pattern; also applies to URL fragments and the `Location`, `Referer`, `Origin`, `Content-Location` headers |
+| `redactBodyKeys` | password, token… | added to the defaults; plus always keys containing `pass`, `pwd`, `secret`, `token`, `otp`, `cvv`, `card`, `auth`, `key`, `session` (case insensitive) |
 | `maxBodyBytes` | 64 KiB | |
-| `windowMs` | 2 min | jak daleko do minulosti |
+| `windowMs` | 2 min | how far back to look |
 
-Těla se redigují po klíčích v JSON, form-urlencoded a multipart (po polích, soubory
-jako `[file]`), i ve vnořeném JSON. Tělo, které bylo oříznuté nebo nejde rozparsovat
-(text, HTML, XML, rozbitý JSON, holý token), se nahradí značkou
-`[body omitted: truncated]` nebo `[body omitted: unparsed]`. `maxBodyBytes` ořízne
-až redigovaný výsledek.
+Bodies are redacted by key in JSON, form-urlencoded and multipart (per field, files as `[file]`), including nested JSON. A body that was truncated or cannot be parsed (text, HTML, XML, broken JSON, a bare token) is replaced with `[body omitted: truncated]` or `[body omitted: unparsed]`. `maxBodyBytes` truncates the redacted result.
 
-Odpověď by měla dorazit do 300 ms. Appka čeká nejvýš 1 s a pak uloží snímek bez kontextu.
+The reply should arrive within 300 ms. The app waits at most 1 s and then saves the screenshot without context.
 
-Mac appka posílá request všem připojeným prohlížečům s `protocol` 1 (deadline 30 s od startu
-snímání, aby pokryl interaktivní výběr výřezu). Přijme jen bundle, jehož `page.geometry`
-(`screenX`, `screenY`, `outerHeight` přepočtené poměrem `windowBounds.width / outerWidth`) sedí
-na `windowBounds` s tolerancí 8 bodů; ostatní odpovědi bere jako odmítnutí. Bundle bez
-`geometry` se při zadaném `windowBounds` nepřijme.
+The app sends the request to every connected browser with `protocol` 1. It accepts only a bundle whose `page.geometry` (`screenX`, `screenY`, `outerHeight` scaled by `windowBounds.width / outerWidth`) matches `windowBounds` within 8 points, and treats other replies as declines. A bundle without `geometry` is rejected when `windowBounds` was given.
 
 ## Bundle
 
@@ -108,130 +93,40 @@ na `windowBounds` s tolerancí 8 bodů; ostatní odpovědi bere jako odmítnutí
   "format": "screenshot-note-context", "version": 1,
   "capturedAt": "ISO", "extensionVersion": "0.1.0",
   "page": { "url", "title", "userAgent", "language", "geometry": { … } },
-  "policy": { … },                 // co se skutečně použilo
+  "policy": { … },                 // what was actually applied
   "summary": { "consoleErrors", "consoleWarnings", "uncaughtErrors", "failedRequests": [ … ], "requestCount" },
   "console": [ ConsoleEntry | ErrorEntry ],
-  "har": { "log": { … } },          // HAR 1.2, otevře se v DevTools
+  "har": { "log": { … } },          // HAR 1.2, opens in DevTools
   "elements": [ { "selector", "tag", "role?", "name?", "text?", "rect": {x,y,width,height}, "depth" } ],
-  "trimmed": { "bodies", "network", "console", "elements", "largeBodies?" }  // jen u zmenšeného bundle
+  "trimmed": { "bodies", "network", "console", "elements", "largeBodies?" }  // only for a reduced bundle
 }
 ```
 
-Redakce probíhá v rozšíření ještě před odesláním. Neredigovaná data rozšíření nikdy neopustí.
+Redaction happens in the extension before sending. Unredacted data never leaves the extension.
 
-### Limity velikosti
+### Size limits
 
-- Bundle má pevný strop 16 MiB měřený v UTF-8 bajtech (`MAX_BUNDLE_BYTES` v `src/lib/capture.ts`).
-- Když je větší, rozšíření ho zmenšuje: nejdřív zahazuje těla od největšího
-  (nahradí je `[body omitted: size limit]`, počet je v `trimmed.largeBodies`),
-  a když to nestačí, zahodí všechna těla. Pak nejstarší záznamy sítě a konzole
-  podle společné časové hranice, a teprve když se nevejde ani bez nich, ubírá
-  elementy. Zmenšený bundle má `trimmed: {bodies, network, console, elements, largeBodies?}`
-  (zda se zahodila všechna těla a počty zahozených záznamů) a v `policy` skutečně
-  použité `includeBodies`. `summary` vždy popisuje celá, nezmenšená data.
-- Když se nevejde ani bez záznamů (např. obří titulek stránky), přijde `capture.error` s kódem `too-large`.
-- Native Messaging (`BridgeWire.swift` v repu `screenshot-note`): bridge skončí na
-  zprávě rozšíření → host nad 64 MiB (`inputLimit`), stejný limit má čtení socketu
-  v appce. Zprávy host → rozšíření nad 1 MiB bridge zahodí (`browserOutputLimit`,
-  odpovídá limitu Chromu). Strop 16 MiB je pod oběma.
-- Content script drží nejvýš 8 Mi znaků záznamů stránky, jednu událost nejvýš 4 Mi znaků.
+- The bundle has a hard cap of 16 MiB in UTF-8 bytes (`MAX_BUNDLE_BYTES` in `src/lib/capture.ts`).
+- When it is larger, the extension reduces it: first it drops bodies from the largest (replaced with `[body omitted: size limit]`, counted in `trimmed.largeBodies`), and if that is not enough, all bodies. Then the oldest network and console entries by a shared time cutoff, and only if it still does not fit, elements. A reduced bundle has `trimmed: {bodies, network, console, elements, largeBodies?}` (whether all bodies were dropped and how many entries were dropped) and the actual `includeBodies` in `policy`. `summary` always describes the full, unreduced data.
+- When it does not fit even without entries (for example a huge page title), the reply is `capture.error` with code `too-large`.
+- Native Messaging: the bridge rejects extension → host messages over 64 MiB, and the app socket has the same limit. Host → extension messages over 1 MiB are dropped (Chrome's limit). The 16 MiB cap is below both.
+- The content script keeps at most 8 Mi characters of page entries, a single event at most 4 Mi characters.
 
-## Uložení v Mac appce
+## Mapping elements onto the screenshot
+
+The extension sends `rect` in CSS pixels of the viewport and `geometry`. The app knows the screenshot rectangle `R` (global points) and the screen's `backingScale`.
 
 ```text
-assets/
-  Bug_1.png
-  Bug_1.context.json   ← bundle bez HAR
-  Bug_1.har
-```
-
-- V pracovní složce draftu leží kontext vedle obrázku jako `<obrázek>.png.context.json`
-  a `<obrázek>.png.har` (0600). `Draft.contexts` mapuje obrázek → soubor kontextu (volitelné pole).
-- Název v `assets/` musí být volný pro `.png`, `.context.json` i `.har` (kolize jako u PNG: `Název-1 2`).
-  Index relace nese hashe všech tří souborů. Znovuotevření najde kontext podle názvu obrázku.
-- Cloudové složky viz „Cloud“ níže.
-- Kontext se exportuje jen do složky, která ho má podle aktuálního nastavení zapnutý.
-- „Odebrat kontext“ v komposeru smaže soubory v draftu; u znovuotevřené relace si draft pamatuje původní název (`Draft.removedContexts`) a `assets/<název>.context.json` a `.har` se smažou až po zápisu Markdownu.
-- Do Markdownu jde nový placeholder `{context}` (souhrn: řádek `- Screenshot N: …` za snímek
-  s kontextem). Výchozí šablona ho nemá. Obrázek v `{screenshots}` dostane pod poznámkou
-  sbalitelný callout (texty ze stránky jen v inline kódu, bez backticků a zalomení):
-
-```markdown
-> [!bug]- Kontext: `https://app.example.com/orders` (2 chyby, 1 selhaný request)
-> - `POST /api/orders` → 500
-> - `TypeError: Cannot read properties of undefined (reading 'id')`
-> - [HAR](<assets/Bug_1.har>) · [konzole](<assets/Bug_1.context.json>)
-```
-
-  U zmenšeného bundle přibude řádek `Zmenšeno kvůli velikosti: bez těl, N requestů…`.
-  Počty v titulku jsou ze `summary` (celá data). Při čtení uložené relace se callout
-  z popisku obrázku odstraní a znovu vygeneruje ze souborů v `assets/`.
-
-## Cloud (F6)
-
-- Politika kontextu cloudové složky platí jen na daném Macu (`CloudContextPolicies` v UserDefaults), výchozí stav vypnuto, zapnutí potvrzuje varování.
-- Job ve frontě nese `attachments: [{index, kind: "context"|"har", bytes, sha256}]` jen pro nové snímky, soubory `<index>.context.json` a `<index>.har` leží vedle PNG v jobu. Strop přílohy je 16 MiB.
-- Kontext pořízený pro jinou složku se ořízne podle politiky cílové složky. Pokud `policy` v bundlu neobsahuje její vlastní `redactHeaders` a `redactQueryParams`, kontext ani HAR se nenahrají.
-- Upload: po commitu relace `PUT /api/v1/sessions/{id}/attachments/{index}/{kind}` (`x-bytes`, `x-sha256`). Opakovaný job pošle přílohy znovu, stejný hash server jen potvrdí.
-- Detail relace má u obrázku `attachments: [{kind, bytes, sha256, path}]`. Prázdný seznam Mac ukládá jako nil, otisk starších relací se nemění.
-- Synchronizace složky zapíše přílohy do `assets/<název>.context.json` a `.har` (0600) a jejich hashe do indexu relace. Odebraná příloha se smaže jen tehdy, když přišla z cloudu.
-- „Odebrat kontext“ u znovuotevřené cloudové relace zařadí `DELETE` příloh (fronta `.attachment-removals`), pošle se po doplnění relace.
-- Řádky Element v cloudu mají selektor a text prvku jen u snímku s kontextem.
-- Web: callout pod snímkem a stažení HAR a konzole jen pro členy library relace. Sdílené odkazy přílohy nevidí. MCP: `browser_context.summary` v `get_session` a nástroj `get_browser_context`.
-- Šifrování zatím není (rozhodnutí 21. 11. 2026).
-
-## Mapování elementů na snímek
-
-Rozšíření pošle `rect` v CSS pixelech viewportu a `geometry`. Mac zná výřez
-snímku `R` (globální body) a `backingScale` obrazovky.
-
-```text
-zoom        = geometry.devicePixelRatio / backingScale      // zoom stránky
-contentLeft = geometry.screenX * zoom                       // macOS nemá boční rámečky
+zoom        = geometry.devicePixelRatio / backingScale      // page zoom
+contentLeft = geometry.screenX * zoom                       // macOS has no side borders
 contentTop  = (geometry.screenY + geometry.outerHeight) * zoom - geometry.innerHeight * zoom
 screenRect  = (contentLeft + x*zoom, contentTop + y*zoom, width*zoom, height*zoom)
-imageRect   = (screenRect - R.origin) * scaleSnímku
+imageRect   = (screenRect - R.origin) * imageScale
 ```
 
-- `backingScale` ve vzorci je měřítko displeje, na kterém leží většina okna prohlížeče
-  (podle něj Chrome hlásí `devicePixelRatio`), ne nutně displeje snímku.
-- Mac ukládá výřez do `<obrázek>.context.json` pod klíč `capture` (klíč z rozšíření zahodí):
-  `{rect, backingScale, imageScale, browserScale?, window?, webAreas?}`. `rect`, `window`
-  a `webAreas` jsou globální body s počátkem vlevo nahoře, `imageScale` = pixely obrázku na bod.
-  Prozradí rozložení displejů a polohu okna (jde do exportu s kontextem).
-  Zatím jen u celoobrazovkového snímku (`-m`, `-D n`) se zapnutou mapou elementů. Výběr
-  oblasti (`-i`) výřez nezná, kontext má bez `capture` a mapa se nepoužije. U `-D` se
-  `capture` neuloží, když má jiný displej stejnou velikost (pořadí `-D` není zdokumentované).
-- `webAreas`: kandidáti `AXWebArea` s adresou `http(s)`, `file` nebo `about` (ne DevTools,
-  postranní panely ani interní stránky), hledaní na pozadí nejvýš 0,3 s. Platí ten, jehož
-  velikost odpovídá `innerWidth/innerHeight * zoom`. Dotaz může v Chromu zapnout podporu
-  Accessibility do konce jeho běhu.
-- Když Mac zná okno prohlížeče z WindowServeru (`capture.window`), počítá místo `screenX`
-  a `outerHeight` z něj: `contentLeft = window.x`, `contentTop = window.maxY - innerHeight * zoom`.
-  Když se `innerWidth * zoom` liší od šířky okna (DevTools nebo panel po straně), mapa bez
-  přesné `webAreas` není.
-- Pinch zoom: `x' = (x - visualViewport.offsetLeft) * visualViewport.scale`, totéž pro y.
-- Prvky se oříznou na viewport i výřez; nulové nebo zcela mimo se vynechají.
-  `devicePixelRatio` 0 (záložní geometrie bez content scriptu) znamená žádnou mapu.
-- Ladění: `defaults write cz.janprasil.screenshotnote BrowserContextDebugElements -bool true`
-  uloží kopii snímku s obdélníky do `$TMPDIR/ScreenshotNote-elements/` (0700, po dni se maže) a cestu zaloguje
-  (`Browser bridge element map`). Testovací stránka: `docs/test-pages/element-map.html`.
-- DevTools ukotvené dole tento výpočet rozbijí. Přesnější zdroj je
-  Accessibility API: `AXWebArea` okna prohlížeče má přesnou pozici obsahu. Pokud
-  appka má oprávnění Accessibility, použije ji, jinak výpočet výše.
-- Hit-test v editoru: klik vybere nejmenší element obsahující bod (při shodném obdélníku
-  hlubší). Opakovaný klik do vybraného nebo `⌥` posune výběr na rodiče (obsahuje ho
-  a má menší hloubku nebo větší plochu). Hover zvýrazní obrys, Esc rozpracovaný výběr zruší.
-  Nástroj je jen u obrázku, jehož velikost odpovídá `capture` (`rect * imageScale`).
-- Anotace typu `element` v `<obrázek>.annotations.json` (Mac): `Mark` s `tool: 7`, obdélníkem
-  v `points` a `element: {number, selector, tag, name, text}`; popis je v `text`. Starší
-  dokumenty bez `element` se načtou beze změny.
-- Export pod obrázek (za popisek, před callout), seřazeno podle čísla:
-  `` - **[1] Element** `button[data-testid="save"]` „Uložit“: popis ``. Místo `name` se
-  použije `text`, oba se zkrátí na 80 znaků a escapují. Selektor, který by vypadal jako odkaz
-  na obrázek, se nahradí tagem. Řádky se ukládají do popisku relace, po znovuotevření jsou
-  součástí popisku obrázku. Prvky zcela mimo ořez se vynechají.
-  Nová čísla po znovuotevření navazují na nejvyšší `[n] Element` v popisku. Bez kontextu
-  (odebraný, vypnutý politikou) a v cloudu se exportuje jen číslo a popis, bez dat stránky.
-- Ořez v editoru: mapa se ořízne na zachovanou oblast a při exportu se `capture.rect`
-  v `assets/<obrázek>.context.json` posune na oříznutou část, aby mapa seděla i po znovuotevření.
+- `backingScale` is the scale of the display holding most of the browser window (Chrome reports `devicePixelRatio` for it), not necessarily the display of the screenshot.
+- When the app knows the browser window from WindowServer, it uses it instead of `screenX` and `outerHeight`: `contentLeft = window.x`, `contentTop = window.maxY - innerHeight * zoom`.
+- DevTools docked at the bottom or a side panel break the calculation. The app can use the `AXWebArea` of the browser window from the Accessibility API, which has the exact content position.
+- Pinch zoom: `x' = (x - visualViewport.offsetLeft) * visualViewport.scale`, the same for y.
+- Elements are clipped to the viewport; empty ones and those fully outside are skipped. `devicePixelRatio` 0 (fallback geometry without a content script) means no element map.
+- Test page: `docs/test-pages/element-map.html`.

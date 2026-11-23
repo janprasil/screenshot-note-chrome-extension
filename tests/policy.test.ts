@@ -76,7 +76,7 @@ test('capture.request cannot switch off cookie redaction or read inactive tabs',
   assert.equal(reply.bundle.policy.redactCookies, true);
   assert.equal(reply.bundle.policy.includeBodies, false);
 
-  // Aktivní záložka nefokusovaného okna se přes tabId vybrat dá.
+  // The active tab of an unfocused window can be picked by tabId.
   const active = await bg.request({ type: 'capture.request', id: '2', target: { tabId: 3 } });
   assert.equal(active.bundle.page.url, 'https://other.example.com/');
 

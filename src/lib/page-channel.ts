@@ -1,5 +1,5 @@
-// Handshake mezi MAIN world skriptem a content scriptem přes MessageChannel.
-// Při document_start ještě neběží žádný skript stránky, takže port stránka nezachytí.
+// Handshake between the MAIN world script and the content script over MessageChannel.
+// At document_start no page script runs yet, so the page cannot grab the port.
 
 export const CHANNEL_HELLO = 'screenshot-note:hello';
 export const CHANNEL_READY = 'screenshot-note:ready';
@@ -11,7 +11,7 @@ export interface ChannelConfig {
   recordBodies: boolean;
 }
 
-/** Zpráva z okna je handshake jen ze stejného okna a se správným typem. */
+/** A window message is a handshake only from the same window and with the right type. */
 export function isChannelMessage(event: MessageEvent, type: string): boolean {
   return event.source === window && typeof event.data === 'object' && event.data !== null && event.data.type === type;
 }

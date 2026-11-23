@@ -19,19 +19,19 @@ export function buildHar(input: HarInput): unknown {
   const used = new Set<PageRequestEntry>();
   const sorted = input.network.slice().sort((a, b) => a.startTime - b.startTime);
 
-  // Vadný záznam se přeskočí, nesmí shodit celý HAR.
+  // A broken entry is skipped; it must not break the whole HAR.
   const entries: { startedDateTime: string }[] = [];
   for (const entry of sorted) {
     const page = matchPageRequest(entry, input.pageRequests, used);
     try {
       entries.push(toHarEntry(entry, page, pageId, policy));
     } catch {
-      // Vadný záznam stránky nesmí shodit záznam webRequest.
+      // A broken page entry must not break the webRequest entry.
       if (page) used.delete(page);
       try {
         entries.push(toHarEntry(entry, undefined, pageId, policy));
       } catch {
-        // Přeskočit.
+        // Skip.
       }
     }
   }
@@ -40,7 +40,7 @@ export function buildHar(input: HarInput): unknown {
     try {
       entries.push(pageOnlyEntry(page, pageId, policy));
     } catch {
-      // Přeskočit.
+      // Skip.
     }
   }
   entries.sort((a, b) => a.startedDateTime.localeCompare(b.startedDateTime));
@@ -64,7 +64,7 @@ export function buildHar(input: HarInput): unknown {
   };
 }
 
-/** Párování webRequest záznamů se záznamy stránky stejně jako v HARu. */
+/** Pairs webRequest entries with page entries the same way as the HAR does. */
 export function pairPageRequests(network: NetworkEntry[], pages: PageRequestEntry[]): Map<NetworkEntry, PageRequestEntry> {
   const used = new Set<PageRequestEntry>();
   const pairs = new Map<NetworkEntry, PageRequestEntry>();
@@ -139,7 +139,7 @@ function toHarEntry(entry: NetworkEntry, page: PageRequestEntry | undefined, pag
         mimeType,
         ...(responseBody.text !== undefined ? { text: responseBody.text } : {}),
       },
-      // Hlavičky už prošly redakcí včetně Location.
+      // Headers are already redacted, including Location.
       redirectURL: headerValue(responseHeaders, 'location') ?? '',
       headersSize: -1,
       bodySize: -1,

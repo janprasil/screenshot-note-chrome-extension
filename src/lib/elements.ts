@@ -2,7 +2,7 @@ import { selectorFor, type SelectorNode } from './selector.ts';
 import type { ElementInfo, PageGeometry } from './types.ts';
 
 const MAX_ELEMENTS = 1_500;
-// Strop navštívených uzlů, aby obří DOM nezdržel capture.
+// Cap on visited nodes, so a huge DOM does not slow capture down.
 const MAX_VISITED = 50_000;
 const MIN_SIZE = 4;
 const TEXT_LIMIT = 120;

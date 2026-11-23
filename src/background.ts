@@ -10,11 +10,11 @@ type Stored = NetworkEntry & { time: number };
 
 const MAX_PER_TAB = 500;
 const MAX_REQUEST_BODY = 64 * 1024;
-// Strop záznamů jedné záložky ve znacích, počet záznamů paměť neomezí.
+// Per-tab cap in characters, because the entry count alone does not bound memory.
 const MAX_TAB_CHARS = 4 * 1024 * 1024;
 const extensionVersion = chrome.runtime.getManifest().version;
 
-// Do načtení nastavení se nic nenahrává, uživatel mohl nahrávání vypnout.
+// Nothing is recorded until settings load; the user may have switched recording off.
 let settings: RecorderSettings = { ...DEFAULT_SETTINGS, enabled: false };
 const tabs = new Map<number, { buffer: RingBuffer<Stored>; byId: Map<string, Stored> }>();
 const dirty = new Set<number>();
@@ -33,7 +33,7 @@ const ready = (async () => {
     const tabId = Number(key.slice(4));
     const state = tabState(tabId);
     state.buffer.replace(value as Stored[]);
-    // Po probuzení workeru se prošlé záznamy zahodí i ze session.
+    // After the worker wakes up, expired entries are pruned from session storage too.
     state.buffer.prune();
     for (const entry of state.buffer.toArray()) state.byId.set(entry.requestId, entry);
     markDirty(tabId);
@@ -59,7 +59,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 const PAGE_RECORDER_ID = 'page-recorder';
 
-/** MAIN skript je ve stránkách jen při zapnutém nahrávání; po zapnutí se doplní do otevřených záložek. */
+/** The MAIN script is in pages only while recording is on; switching on adds it to open tabs. */
 async function syncPageRecorder(injectOpenTabs: boolean): Promise<void> {
   try {
     const registered = (await chrome.scripting.getRegisteredContentScripts({ ids: [PAGE_RECORDER_ID] })).length > 0;
@@ -70,12 +70,12 @@ async function syncPageRecorder(injectOpenTabs: boolean): Promise<void> {
     }
     if (!settings.enabled && registered) await chrome.scripting.unregisterContentScripts({ ids: [PAGE_RECORDER_ID] });
   } catch {
-    // Registrace se zopakuje při další změně nastavení nebo startu workeru.
+    // Registration is retried on the next settings change or worker start.
   }
   if (!settings.enabled || !injectOpenTabs) return;
   for (const tab of await chrome.tabs.query({})) {
     if (tab.id === undefined || !/^https?:/.test(tab.url ?? '')) continue;
-    // Záložka bez content scriptu nebo s už připojeným recorderem se přeskočí.
+    // Tabs without a content script or with a connected recorder are skipped.
     const status = (await chrome.tabs.sendMessage(tab.id, { type: 'recorder-status' }, { frameId: 0 }).catch(() => undefined)) as { connected?: boolean } | undefined;
     if (!status || status.connected) continue;
     await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: [0] }, world: 'MAIN', files: ['inject.js'] }).catch(() => undefined);
@@ -91,14 +91,14 @@ function tabState(tabId: number) {
   return state;
 }
 
-/** Přibližná velikost záznamu ve znacích. */
+/** Approximate entry size in characters. */
 function storedSize(entry: Stored): number {
   let size = 200 + entry.url.length + (entry.requestBody?.length ?? 0) + (entry.error?.length ?? 0);
   for (const header of [...(entry.requestHeaders ?? []), ...(entry.responseHeaders ?? [])]) size += header.name.length + header.value.length;
   return size;
 }
 
-/** Záznam se po vložení změnil, přepočítá se jeho velikost a uloží se. */
+/** The entry changed after insertion; recompute its size and persist it. */
 function changed(tabId: number, entry: Stored): void {
   tabs.get(tabId)?.buffer.resize(entry);
   markDirty(tabId);
@@ -170,7 +170,7 @@ chrome.webRequest.onBeforeRequest.addListener(
   filter,
 );
 
-// Těla si od Chromu bere samostatný listener, registrovaný jen při zapnutém nahrávání těl.
+// Bodies come from a separate listener, registered only while body recording is on.
 function onRequestBody(details: chrome.webRequest.WebRequestBodyDetails): void {
   if (!settings.enabled || !settings.recordBodies || details.tabId < 0) return;
   const body = requestBodyText(details.requestBody);
@@ -181,7 +181,7 @@ function onRequestBody(details: chrome.webRequest.WebRequestBodyDetails): void {
     changed(details.tabId, entry);
     return;
   }
-  // Pořadí listenerů není zaručené, hlavní listener si tělo vyzvedne.
+  // Listener order is not guaranteed; the main listener picks up the body.
   pendingBodies.set(details.requestId, body);
   if (pendingBodies.size > 100) pendingBodies.delete(pendingBodies.keys().next().value!);
 }
@@ -205,7 +205,7 @@ function clearBodies(): void {
     }
   }
   if (!found) return;
-  // Uložená těla přepíšeme hned, při chybě smažeme celé záznamy v session.
+  // Stored bodies are cleared right away; on failure the session entries are deleted.
   if (flushTimer) clearTimeout(flushTimer);
   void flush().then((ok) => {
     if (!ok) void chrome.storage.session.remove([...tabs.keys()].map((tabId) => `net:${tabId}`));
@@ -265,7 +265,7 @@ function headers(list: chrome.webRequest.HttpHeader[] | undefined): Header[] | u
 function requestBodyText(body: chrome.webRequest.WebRequestBody | null | undefined): string | undefined {
   if (!body) return undefined;
   if (body.formData) {
-    // Formulář se skládá postupně, aby obří pole neprošlo přes limit.
+    // The form is built incrementally so a huge field cannot pass the limit.
     const fields: string[] = [];
     let length = 0;
     for (const [key, values] of Object.entries(body.formData)) {
@@ -281,7 +281,7 @@ function requestBodyText(body: chrome.webRequest.WebRequestBody | null | undefin
   if (body.raw && body.raw.length > 1) return body.raw.some((part) => part.file) ? '[file upload]' : BODY_TRUNCATED;
   const bytes = body.raw?.find((part) => part.bytes)?.bytes;
   if (!bytes) return body.raw?.length ? '[file upload]' : undefined;
-  // Oříznuté tělo nejde spolehlivě redigovat, posílá se jen značka.
+  // A truncated body cannot be redacted reliably, so only a marker is sent.
   if (bytes.byteLength > MAX_REQUEST_BODY) return BODY_TRUNCATED;
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -298,7 +298,7 @@ export interface CaptureTarget {
   tabId?: number;
 }
 
-/** Cílová záložka; anonymní se odmítne, nikdy se nenahradí jinou. */
+/** Target tab; an incognito tab is rejected, never replaced by another. */
 async function findTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
   const tab = await pickTab(input);
   return tab?.incognito ? undefined : tab;
@@ -309,7 +309,7 @@ async function pickTab(input: unknown): Promise<chrome.tabs.Tab | undefined> {
   const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal', 'popup', 'app'] });
   const activeTab = (window: chrome.windows.Window) => window.tabs?.find((tab) => tab.active);
 
-  // Přímé tabId platí jen pro aktivní záložku některého okna, jinak se cíl ignoruje.
+  // A direct tabId applies only to an active tab of a window, otherwise the target is ignored.
   if (target?.tabId !== undefined) {
     const tab = windows.map(activeTab).find((candidate) => candidate?.id === target?.tabId);
     if (tab) return tab;
@@ -349,7 +349,7 @@ function parseTarget(input: unknown): CaptureTarget | undefined {
   }
   if (typeof raw.windowTitle === 'string') target.windowTitle = raw.windowTitle;
   if (raw.tabId !== undefined) {
-    // Neplatné tabId zahodí celý cíl, stejně jako neaktivní záložka.
+    // An invalid tabId drops the whole target, like an inactive tab.
     if (!Number.isInteger(raw.tabId)) return undefined;
     target.tabId = raw.tabId as number;
   }

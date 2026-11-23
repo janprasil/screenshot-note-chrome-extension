@@ -21,7 +21,7 @@ test('bundle summarizes errors and respects include switches', () => {
       { kind: 'console', time: 2, level: 'warn', args: ['hm'], url: page.url },
       { kind: 'error', time: 3, message: 'TypeError', unhandledRejection: false, url: page.url },
     ],
-    elements: [{ selector: '#a', tag: 'button', text: 'Uložit', rect: { x: 1, y: 2, width: 3, height: 4 }, depth: 1 }],
+    elements: [{ selector: '#a', tag: 'button', text: 'Save', rect: { x: 1, y: 2, width: 3, height: 4 }, depth: 1 }],
     network: [{ requestId: '1', tabId: 1, url: 'https://api.example.com/x', method: 'GET', type: 'fetch', startTime: 1, statusCode: 404 }],
     policy: { ...DEFAULT_POLICY, includeElementText: false },
     extensionVersion: '0.1.0',

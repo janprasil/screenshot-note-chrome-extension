@@ -32,7 +32,7 @@ export function selectorFor(element: SelectorNode, isUnique: (selector: string) 
 function anchorSelector(node: SelectorNode): string | undefined {
   for (const attribute of TEST_ATTRIBUTES) {
     const value = node.getAttribute(attribute);
-    // Dlouhé hodnoty by nafoukly odpověď, takový atribut kotvou není.
+    // Long values would bloat the reply, so such an attribute is not an anchor.
     if (value && value.length <= 100) return `[${attribute}="${escapeAttribute(value)}"]`;
   }
   if (node.id && isStableId(node.id)) return `#${escapeIdentifier(node.id)}`;

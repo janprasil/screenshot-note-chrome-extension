@@ -1,14 +1,14 @@
-// Ověření záznamů ze stránky; událost může poslat i stránka sama, takže jí nevěříme.
+// Validation of page entries; the page itself can send events, so they are untrusted.
 import { BODY_TRUNCATED } from './redact.ts';
 import type { ConsoleLevel, PageEntry } from './types.ts';
 
 export const MAX_ARGS = 50;
-// serializeArg řeže na 4000 znaků a přidá značku délky, proto rezerva.
+// serializeArg cuts at 4000 characters and adds a length marker, hence the margin.
 export const MAX_ARG_LENGTH = 4_100;
 export const MAX_TEXT_LENGTH = 16_000;
 export const MAX_URL_LENGTH = 8_000;
 export const MAX_BODY_LENGTH = 256 * 1024;
-/** Horní mez pro celý buffer záznamů v content scriptu (UTF-16 jednotky JSONu). */
+/** Upper bound for the whole entry buffer in the content script (UTF-16 units of JSON). */
 export const MAX_BUFFER_CHARS = 8 * 1024 * 1024;
 
 const LEVELS: ConsoleLevel[] = ['log', 'info', 'warn', 'error', 'debug', 'trace'];
@@ -21,7 +21,7 @@ const nonNegative = (value: unknown): number | undefined => {
 };
 const httpStatus = (value: unknown): number | undefined => (Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 999 ? (value as number) : undefined);
 
-/** Vrátí ošetřený záznam, nebo undefined, pokud nemá platný tvar. */
+/** Returns the sanitized entry, or undefined when its shape is invalid. */
 export function sanitizePageEntry(raw: unknown, now = Date.now()): PageEntry | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const entry = raw as Record<string, unknown>;
@@ -72,7 +72,7 @@ export function sanitizePageEntry(raw: unknown, now = Date.now()): PageEntry | u
   return undefined;
 }
 
-/** Přibližná velikost záznamu v UTF-16 jednotkách JSONu. */
+/** Approximate entry size in UTF-16 units of JSON. */
 export function entrySize(entry: PageEntry): number {
   return JSON.stringify(entry).length;
 }

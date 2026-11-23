@@ -1,9 +1,9 @@
 const MAX_ARG_LENGTH = 4_000;
 const MAX_DEPTH = 4;
 const MAX_KEYS = 50;
-// Rozpočet jednoho argumentu, aby velký objekt nezdržel stránku.
+// Budget per argument, so a big object does not slow the page down.
 const MAX_NODES = 2_000;
-// Hodnoty pod citlivým klíčem se skryjí už ve stránce, včetně objektů a polí.
+// Values under a sensitive key are hidden in the page already, including objects and arrays.
 const SENSITIVE_KEY_PARTS = ['pass', 'pwd', 'secret', 'token', 'otp', 'cvv', 'card', 'auth', 'key', 'session', 'cookie', 'jwt', 'credential'];
 const REDACTED = '"[redacted]"';
 
@@ -31,7 +31,7 @@ export function serializeArg(value: unknown): string {
 function describe(value: unknown, depth: number, seen: WeakSet<object>, budget: Budget): string {
   if (--budget.nodes < 0 || budget.chars <= 0) return '…';
   const text = describeValue(value, depth, seen, budget);
-  // Objekty se nepočítají, jejich obsah už odečetly vnořené hodnoty.
+  // Objects are not counted; nested values already used up the budget.
   if (!value || typeof value !== 'object' || value instanceof Error) budget.chars -= text.length;
   return text;
 }
@@ -40,7 +40,7 @@ function describeValue(value: unknown, depth: number, seen: WeakSet<object>, bud
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'string') {
-    // Vnořený JSON v řetězci se rozbalí, aby se v něm skryly citlivé klíče.
+    // JSON nested in a string is expanded so its sensitive keys get hidden.
     const nested = depth > 0 && value.length <= MAX_ARG_LENGTH && /^\s*[[{]/.test(value) ? parseJson(value) : undefined;
     if (nested !== undefined) return describeValue(nested, depth, seen, budget);
     return JSON.stringify(value.length > MAX_ARG_LENGTH ? `${value.slice(0, MAX_ARG_LENGTH)}…` : value);

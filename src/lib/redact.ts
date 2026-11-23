@@ -3,7 +3,7 @@ import type { CapturePolicy, Header } from './types.ts';
 
 export const REDACTED = '[redacted]';
 
-// Hlavičky, jejichž hodnota je URL.
+// Headers whose value is a URL.
 const URL_HEADERS = ['location', 'referer', 'origin', 'content-location'];
 
 /** Keeps cookie names and replaces their values. */
@@ -40,7 +40,7 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     if (custom.has(lower)) return { name, value: REDACTED };
     if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
     if (lower === 'refresh') {
-      // Celý zbytek hlavičky se rediguje jako URL, nic za ní neprojde; uvozovky jen na krajích.
+      // The whole rest of the header is redacted as a URL; quotes are stripped only at the edges.
       return {
         name,
         value: value.replace(/(url\s*=\s*)(.*)$/is, (_match, prefix: string, rest: string) => {
@@ -61,7 +61,7 @@ function redactAuthValue(value: string): string {
   return match ? `${match[1]} ${REDACTED}` : REDACTED;
 }
 
-/** Redaguje přihlašovací údaje a citlivé parametry v query i ve fragmentu, funguje i pro relativní URL. */
+/** Redacts credentials and sensitive parameters in the query and fragment, also for relative URLs. */
 export function redactUrl(url: string, policy: CapturePolicy): string {
   if (typeof url !== 'string') return '';
   const names = new Set(policy.redactQueryParams.map((name) => name.toLowerCase()));
@@ -87,7 +87,7 @@ export function redactUrl(url: string, policy: CapturePolicy): string {
 
 function redactUserInfo(base: string): string {
   if (!base.includes('@')) return base;
-  // Protokolově relativní URL (`//u:p@host`) parsujeme s dočasným schématem.
+  // Protocol-relative URLs (`//u:p@host`) are parsed with a temporary scheme.
   const relative = base.startsWith('//');
   try {
     const parsed = new URL(relative ? `http:${base}` : base);
@@ -100,7 +100,7 @@ function redactUserInfo(base: string): string {
   }
 }
 
-/** Nahradí hodnoty citlivých parametrů a ostatní nechá beze změny. */
+/** Replaces values of sensitive parameters and leaves the rest unchanged. */
 function redactParams(params: string, sensitive: (name: string) => boolean): string {
   return params
     .split(/([&#])/)
@@ -113,7 +113,7 @@ function redactParams(params: string, sensitive: (name: string) => boolean): str
     .join('');
 }
 
-// Fragment bývá `a=1&b=2` (implicit flow) nebo `/route?a=1` (SPA).
+// A fragment is usually `a=1&b=2` (implicit flow) or `/route?a=1` (SPA).
 function redactFragment(fragment: string, sensitive: (name: string) => boolean): string {
   const index = fragment.indexOf('?');
   if (index !== -1) return `${fragment.slice(0, index + 1)}${redactParams(fragment.slice(index + 1), sensitive)}`;
@@ -128,10 +128,10 @@ function decodeName(name: string): string {
   }
 }
 
-/** Redaguje všechny absolutní URL nalezené ve volném textu, např. ve stack trace. */
+/** Redacts every absolute URL found in free text, for example in a stack trace. */
 export function redactUrlsInText(text: string, policy: CapturePolicy): string {
   if (typeof text !== 'string') return text;
-  // Omezená délka schématu brání kvadratickému běhu na textu typu `a.a.a.…`.
+  // The bounded scheme length prevents quadratic time on text like `a.a.a.…`.
   return text.replace(/\b[a-z][\w+.-]{0,31}:\/\/[^\s)'"<>]+/gi, (url) => redactUrl(url, policy));
 }
 
@@ -140,20 +140,20 @@ export const BODY_TRUNCATED = '[body omitted: truncated]';
 export const BODY_TOO_LARGE = '[body omitted: size limit]';
 export const NESTED_OMITTED = '[nested value omitted]';
 
-// Vlastní značky rozšíření místo těla, ty se posílají beze změny.
+// The extension's own body markers are sent unchanged.
 const BODY_MARKERS = new Set(['[binary body]', '[file upload]', '[file]', BODY_UNPARSED, BODY_TRUNCATED, BODY_TOO_LARGE]);
 
-// Klíč těla je citlivý, pokud obsahuje některou z těchto částí.
+// A body key is sensitive when it contains any of these parts.
 const SENSITIVE_BODY_PARTS = ['pass', 'pwd', 'secret', 'token', 'otp', 'cvv', 'card', 'auth', 'key', 'session'];
 
-// Jak hluboko se hledá JSON nebo formulář vnořený v hodnotách.
+// How deep JSON or form data nested in values is searched.
 const MAX_NESTING = 3;
 
 type Sensitive = (key: string) => boolean;
 
 /**
- * Redaguje citlivé klíče v JSON, form-urlencoded a multipart tělech.
- * Oříznutá nebo nerozparsovatelná těla nahradí značkou, surový text nikdy nepošle.
+ * Redacts sensitive keys in JSON, form-urlencoded and multipart bodies.
+ * Truncated or unparsable bodies become a marker; raw text is never sent.
  */
 export function redactBody(
   body: string | undefined,
@@ -178,18 +178,18 @@ function sensitiveBodyKey(policy: CapturePolicy): Sensitive {
   };
 }
 
-// Dvojice "klíč": hodnota ve volném textu; hodnota je řetězec, číslo, nebo objekt či pole bez dalšího zanoření.
+// A "key": value pair in free text; the value is a string, a number, or a flat object or array.
 const TEXT_PAIR = /"((?:[^"\\\n]|\\.){1,128})"(\s*:\s*)("(?:[^"\\\n]|\\.)*"|-?\d[\d.eE+-]*|\{[^{}]*\}|\[[^[\]]*\])/g;
 const TEXT_AUTH = /\b(Bearer|Basic|Digest|Token)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 
-/** Redaguje URL, autorizační hodnoty a citlivé dvojice klíč–hodnota ve volném textu, např. v argumentech konzole. */
+/** Redacts URLs, auth values and sensitive key-value pairs in free text, for example console arguments. */
 export function redactSecretsInText(text: string, policy: CapturePolicy): string {
   if (typeof text !== 'string') return text;
   const sensitive = sensitiveBodyKey(policy);
   const pairs = (input: string): string =>
     input.replace(TEXT_PAIR, (match, key: string, separator: string, value: string) => {
       if (sensitive(key)) return `"${key}"${separator}"${REDACTED}"`;
-      // Necitlivý objekt nebo pole může mít citlivé klíče uvnitř.
+      // A non-sensitive object or array can hold sensitive keys inside.
       return value.startsWith('{') || value.startsWith('[') ? `"${key}"${separator}${value[0]}${pairs(value.slice(1))}` : match;
     });
   return pairs(redactUrlsInText(text, policy).replace(TEXT_AUTH, (_match, scheme: string) => `${scheme} ${REDACTED}`));
@@ -206,14 +206,14 @@ function redactStructured(body: string, sensitive: Sensitive, mimeType: string, 
     }
   }
   if (trimmed.startsWith('--')) return redactMultipart(body, sensitive, depth);
-  // Webový formulář (i multipart, který Chrome předá jako formData) smí mít pole bez hodnoty.
+  // A web form (including multipart that Chrome passes as formData) may have fields without a value.
   if (isFormBody(trimmed, mimeType.includes('form'))) return redactForm(trimmed, sensitive, depth);
   return undefined;
 }
 
 /**
- * Form-urlencoded bez mezer, uvozovek a středníků, v každém poli nejvýš jedno `=`.
- * Pole bez `=` jsou povolená jen u těla s form Content-Type, jinak by prošel holý token.
+ * Form-urlencoded without spaces, quotes or semicolons, at most one `=` per field.
+ * Fields without `=` are allowed only with a form Content-Type, otherwise a bare token would pass.
  */
 function isFormBody(text: string, declaredForm: boolean): boolean {
   if (/[\s";]/.test(text) || !text.includes('=')) return false;
@@ -241,8 +241,8 @@ function redactForm(text: string, sensitive: Sensitive, depth: number): string {
 }
 
 /**
- * Vnořený JSON v hodnotě se rediguje také; vrací undefined, když hodnota JSON není.
- * JSON za limitem zanoření nebo rozbitý JSON s klíči se nahradí značkou, jinak by prošel neredigovaný.
+ * Nested JSON in a value is redacted too; returns undefined when the value is not JSON.
+ * JSON past the depth limit or broken JSON with keys becomes a marker, otherwise it would pass unredacted.
  */
 function redactNested(value: string, sensitive: Sensitive, depth: number): string | undefined {
   const trimmed = value.trim();
@@ -255,7 +255,7 @@ function redactNested(value: string, sensitive: Sensitive, depth: number): strin
   }
 }
 
-/** Multipart po polích: citlivá pole a soubory se nahradí, epilog se zahodí, jinak undefined. */
+/** Multipart per field: sensitive fields and files are replaced, the epilogue is dropped; otherwise undefined. */
 function redactMultipart(body: string, sensitive: Sensitive, depth: number): string | undefined {
   const match = /^--([^\r\n]{1,200})\r?\n/.exec(body);
   if (!match) return undefined;
@@ -289,7 +289,7 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Pole typu {"name": "password", "value": "…"} skryjí i hodnotu.
+// Fields like {"name": "password", "value": "…"} hide the value too.
 const PAIR_NAME_KEYS = ['name', 'field', 'key', 'id'];
 
 function redactJson(value: unknown, sensitive: Sensitive, depth: number): unknown {
@@ -301,7 +301,7 @@ function redactJson(value: unknown, sensitive: Sensitive, depth: number): unknow
     const output: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(record)) {
       const hide = sensitive(key) || (pairIsSensitive && key === 'value');
-      // defineProperty zachová i klíč __proto__.
+      // defineProperty keeps a __proto__ key as data.
       Object.defineProperty(output, key, { value: hide ? REDACTED : redactJson(item, sensitive, depth), enumerable: true, writable: true, configurable: true });
     }
     return output;

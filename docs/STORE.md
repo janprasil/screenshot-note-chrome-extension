@@ -1,14 +1,12 @@
-# Chrome Web Store: podklady (návrh)
+# Chrome Web Store listing
 
-Stav: návrh k revizi. Texty pro Store jsou anglicky, poznámky česky.
+## Release steps
 
-## Postup vydání
-
-1. Založit položku v Developer Dashboardu a nahrát `npm run package:store` (zip bez `key`).
-2. Store přidělí ID. Jeho veřejný klíč (Package → Public key) dát do `src/manifest.json` jako `key`, aby dev build měl stejné ID jako Store.
-3. V Mac appce a v `dev-host/install.sh` mít v `allowed_origins` jen toto ID. Starý dev klíč `hffkngdj…` odstranit.
-4. Privacy policy zveřejnit na veřejné URL (např. web Screenshot Note) a odkázat ji v Dashboardu.
-5. Vyplnit Privacy practices podle sekce níže.
+1. Create the item in the Developer Dashboard and upload the output of `npm run package:store` (a zip without `key`).
+2. The Store assigns the extension ID. Put its public key (Package → Public key) into `src/manifest.json` as `key`, so the development build has the same ID as the Store build.
+3. The Mac app and `dev-host/install.sh` list only that ID in `allowed_origins`. Remove the old development ID.
+4. Publish the privacy policy at a public URL and link it in the Dashboard.
+5. Fill in Privacy practices as described below.
 
 ## Single purpose
 
@@ -42,8 +40,8 @@ Screenshot Note Context ("the extension") helps you attach technical context to 
 
 *Redaction.* Before any data leaves the browser, the extension redacts cookie values, authorization headers, tokens and other sensitive URL parameters, sensitive fields in request and response bodies (for example passwords, tokens, card numbers) and recognizable secrets in console messages. Redaction is best effort; free text that does not look like a secret cannot be detected.
 
-*Where the data goes.* The extension sends the redacted context only to the Screenshot Note app installed on your Mac, and only when a screenshot is taken or when you download the context yourself from the extension popup. The extension itself does not send data to any server. If you save the screenshot to a Screenshot Note cloud folder, the Screenshot Note app uploads the context together with the screenshot according to that folder's settings; that upload is covered by the Screenshot Note privacy policy.
+*Where the data goes.* The extension sends the redacted context only to the Screenshot Note app installed on your Mac, and only when a screenshot is taken or when you download the context yourself from the extension popup. The extension itself does not send data to any server. If you save the screenshot to a Screenshot Note cloud folder, the Screenshot Note app uploads the context together with the screenshot according to that folder's settings; that upload is covered by the privacy policy of the Screenshot Note cloud, operated by Performance4 s.r.o.
 
 *What we do not do.* We do not sell data, use it for advertising, or share it with third parties.
 
-*Contact.* [doplnit kontakt]
+*Contact.* [TODO: contact address]

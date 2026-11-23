@@ -21,10 +21,10 @@ export const AUTH_HEADERS = [
   'x-xsrf-token',
 ];
 
-/** Citlivé jméno hlavičky nebo query parametru, platí navíc k přesným seznamům. */
+/** Sensitive header or query parameter name, on top of the exact lists. */
 export const SENSITIVE_NAME_PATTERN = /token|secret|key|auth|session|csrf|signature|credential|password|pass|pwd|otp|jwt|assertion|oidc|principal|appcheck|dpop/i;
 
-// Hlavičky, které vzor zachytí, ale jejich hodnota nic citlivého nenese.
+// Headers the pattern matches although their value is not sensitive.
 export const BENIGN_HEADERS = ['keep-alive', 'access-control-allow-credentials', 'www-authenticate', 'proxy-authenticate'];
 
 export const DEFAULT_POLICY: CapturePolicy = {
@@ -48,8 +48,8 @@ export const DEFAULT_POLICY: CapturePolicy = {
 const MAX_LIST = 200;
 
 /**
- * Policy od hostu smí redakci jen přidat, nikdy ubrat.
- * Pole se špatným typem se ignorují, těla jdou ven jen při zapnutém nahrávání těl.
+ * Policy from the host may only add redaction, never remove it.
+ * Fields with a wrong type are ignored; bodies leave only while body recording is on.
  */
 export function normalizePolicy(input: unknown, settings: RecorderSettings): CapturePolicy {
   const raw = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;

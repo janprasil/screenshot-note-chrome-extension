@@ -4,18 +4,18 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const outDir = process.env.SN_DEV_OUT ?? join(homedir(), 'Downloads', 'screenshot-note-dev');
-// Exporty obsahují data stránek, čte je jen vlastník.
+// Exports hold page data, readable only by the owner.
 mkdirSync(outDir, { recursive: true, mode: 0o700 });
 chmodSync(outDir, 0o700);
 const pidFile = join(outDir, 'host.pid');
 writeFileSync(pidFile, String(process.pid), { mode: 0o600 });
-// Neplatné PID by po skončení mohl dostat cizí proces.
-// Soubor se smaže, jen když pořád patří tomuto procesu.
+// A stale PID could later belong to another process.
+// The file is removed only while it still belongs to this process.
 process.on('exit', () => {
   try {
     if (readFileSync(pidFile, 'utf8') === String(process.pid)) rmSync(pidFile, { force: true });
   } catch {
-    // Soubor už neexistuje.
+    // The file no longer exists.
   }
 });
 

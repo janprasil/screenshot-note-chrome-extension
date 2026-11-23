@@ -124,3 +124,54 @@ test('URL redaction in text stays linear on hostile input', () => {
   assert.ok(performance.now() - start < 200, 'redaction took too long');
   assert.doesNotMatch(redactSecretsInText('...https://a.example/?token=SECRET -http://b.example/?token=SECRET2', DEFAULT_POLICY), /SECRET/);
 });
+
+test('element names are dropped together with element texts', () => {
+  const bundle = buildBundle({
+    page,
+    entries: [],
+    elements: [{ selector: '#a', tag: 'button', name: 'Smazat účet jan@example.com', text: 'Smazat', rect: { x: 0, y: 0, width: 1, height: 1 }, depth: 1 }],
+    network: [],
+    policy: { ...DEFAULT_POLICY, includeElementText: false },
+    extensionVersion: '0',
+    now: 0,
+  });
+  assert.equal(bundle.elements?.[0].name, undefined);
+  assert.equal(bundle.elements?.[0].text, undefined);
+});
+
+test('quoted Refresh URLs are redacted', async () => {
+  const { redactHeaders } = await import('../src/lib/redact.ts');
+  const [header] = redactHeaders([{ name: 'Refresh', value: '0; url="https://user:SECRET@a.example/x?token=T"' }], DEFAULT_POLICY);
+  assert.doesNotMatch(header.value, /SECRET|token=T/);
+  assert.match(header.value, /^0; url="https:\/\//);
+});
+
+test('summary counts requests seen only by the page recorder', () => {
+  const bundle = buildBundle({
+    page,
+    entries: [{ kind: 'request', time: 1, api: 'fetch', method: 'GET', url: 'https://a.example/sw-only', status: 200 }],
+    network: [],
+    policy: DEFAULT_POLICY,
+    extensionVersion: '0',
+    now: 0,
+  });
+  assert.equal(bundle.summary.requestCount, 1);
+});
+
+test('ring buffer drops entries older than the window on push', () => {
+  const buffer = new RingBuffer<{ time: number }>(10, 1_000);
+  buffer.push({ time: 1_000 });
+  buffer.push({ time: 5_000 });
+  assert.deepEqual(buffer.toArray(), [{ time: 5_000 }]);
+});
+
+test('incognito windows are never captured', async () => {
+  const bg = await loadBackground({
+    settings: { enabled: true, recordBodies: false, bufferMs: 300_000 },
+    windows: [{ id: 1, focused: true, incognito: true, left: 0, top: 0, width: 1200, height: 800, tabs: [{ id: 1, windowId: 1, active: true, url: 'https://a.example/', title: 'A' }] } as any],
+    collect: () => ({ page: { ...page }, entries: [] }),
+  });
+  await tick();
+  const reply = await bg.request({ type: 'capture.request', id: 'inc' });
+  assert.equal(reply.type, 'capture.error');
+});

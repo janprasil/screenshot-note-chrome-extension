@@ -2,6 +2,11 @@
 # Registers the development native host for Chrome. Usage: ./dev-host/install.sh <extension-id>
 set -eu
 EXTENSION_ID="${1:?Pass the extension ID from chrome://extensions}"
+# Extension ID is 32 letters a-p, anything else would break the manifest JSON.
+case "$EXTENSION_ID" in
+  *[!a-p]*) echo "Invalid extension ID: $EXTENSION_ID" >&2; exit 1 ;;
+esac
+[ "${#EXTENSION_ID}" -eq 32 ] || { echo "Invalid extension ID length: $EXTENSION_ID" >&2; exit 1; }
 HOST_NAME="cz.janprasil.screenshotnote.bridge"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 NODE="$(command -v node)"

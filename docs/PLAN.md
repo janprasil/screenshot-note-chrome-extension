@@ -20,6 +20,7 @@ network (HAR) a mapu elementů. Element se pak dá vybrat a popsat v anotaci.
 - [x] Opravy z review před zveřejněním (Codex + Opus, 23. 11.): vnořený JSON za limitem a rozbitý vnořený JSON se nahradí značkou, redakce argumentů konzole a síťových chyb, limit formulářů a velikosti webRequest bufferu, omezené čtení těl odpovědí bez streamů, serializace konzole jen při zapnutém nahrávání a s rozpočtem, XHR listener `once`, ořez těl od největšího.
 - [x] MAIN skript registrovaný přes `chrome.scripting` jen při zapnutém nahrávání, po zapnutí doplněný do otevřených záložek. Kanál MAIN ↔ content přes `MessageChannel` místo DOM událostí, bez globálního příznaku ve stránce. Odebrané oprávnění `tabs`.
 - [x] Příprava na Chrome Web Store: `npm run package:store` (zip bez `key`), texty přepínače těl v popupu, podklady a návrh privacy policy v `docs/STORE.md`. Zbývá: založit položku ve Store, převzít její klíč, zveřejnit privacy policy, licence.
+- [x] Drobné nálezy z review: jméno prvku jen s texty, prořez bufferu podle stáří při vložení a po probuzení workeru, uvozovaný `Refresh`, anonymní okna se neexportují, `requestCount` včetně požadavků jen ze stránky, strop průchodu DOM a délky selektoru, dev-host se soubory 0600, validací ID a mazáním PID souboru.
 - [ ] Šifrování příloh v cloudu (PRIVACY.md), zatím odloženo.
 - [ ] Později: těla přes `chrome.debugger` (volitelný režim), Safari Web Extension, Firefox, shadow DOM a iframy v mapě elementů, picker elementu přímo v prohlížeči.
 

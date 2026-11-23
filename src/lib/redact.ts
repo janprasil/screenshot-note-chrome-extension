@@ -39,7 +39,10 @@ export function redactHeaders(headers: Header[] | undefined, policy: CapturePoli
     if (policy.redactAuthHeaders && sensitiveName) return { name, value: redactAuthValue(value) };
     if (custom.has(lower)) return { name, value: REDACTED };
     if (URL_HEADERS.includes(lower)) return { name, value: redactUrl(value, policy) };
-    if (lower === 'refresh') return { name, value: value.replace(/(url\s*=\s*)(\S+)/i, (_match, prefix: string, url: string) => prefix + redactUrl(url, policy)) };
+    if (lower === 'refresh') {
+      // URL může být v uvozovkách, ty se při redakci zachovají.
+      return { name, value: value.replace(/(url\s*=\s*)(["']?)([^"'\s]+)/i, (_match, prefix: string, quote: string, url: string) => prefix + quote + redactUrl(url, policy)) };
+    }
     return { name, value };
   });
 }

@@ -23,6 +23,8 @@ export class RingBuffer<T extends { time: number }> {
     this.sizes.push(size);
     this.total += size;
     this.trim();
+    // Záznamy starší než okno vůči nejnovějšímu se zahodí hned, ne až při exportu.
+    if (this.items.length > 0 && this.items[0].time < item.time - this.maxAgeMs) this.prune(item.time);
   }
 
   /** Přepočítá velikost záznamu, který se po vložení změnil, a případně uvolní nejstarší. */

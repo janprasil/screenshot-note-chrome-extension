@@ -8,7 +8,8 @@
     "watch": "node scripts/build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/*.test.ts\"",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "package:store": "npm run build && node scripts/package-store.mjs"
   },
   "engines": {
     "node": ">=23.6"

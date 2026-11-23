@@ -3,8 +3,8 @@
 Každá fáze běží v **nové čisté session** Claude Code. Na konci fáze session
 vygeneruje prompt pro další fázi podle šablony níže a doplní do něj skutečný stav.
 
-- Mac worktree: `/Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser`
-- Rozšíření: `/Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension`
+- Mac worktree: `../screenshot-note-browser`
+- Rozšíření: `.`
 - Větve: `feat/browser-context-p1` … `p5`. Každá fáze stojí na předchozí, nebo na `main`, pokud už je předchozí mergnutá.
 
 ## Společná pravidla (platí pro každou fázi)
@@ -35,8 +35,8 @@ vygeneruje prompt pro další fázi podle šablony níže a doplní do něj skut
 Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F1 z 5: bridge a spojení.
 
 Repa:
-- Mac worktree: /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p1, base origin/main)
-- Rozšíření: /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension
+- Mac worktree: ../screenshot-note-browser (větev feat/browser-context-p1, base origin/main)
+- Rozšíření: .
 
 Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F1), docs/PROTOCOL.md, src/lib/defaults.ts a src/background.ts (sekce native bridge). V Mac repu: build.sh, Info.plist, a v main.swift jen start appky a nastavení (grep -n).
 
@@ -75,7 +75,7 @@ Na konci postupuj podle „Na konci fáze“ v docs/MAC-PHASES.md a vypiš promp
 ```text
 Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F2 z 5: kontext při snímku, uložení a export.
 
-Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (nová větev feat/browser-context-p2 z p1 nebo z main, pokud je p1 mergnutá), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
+Repa: Mac worktree ../screenshot-note-browser (nová větev feat/browser-context-p2 z p1 nebo z main, pokud je p1 mergnutá), rozšíření ..
 
 Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F2), docs/PROTOCOL.md (sekce Bundle a Uložení), docs/PLAN.md. V Mac repu: `Sources/ScreenshotNoteKit/BrowserBridge/BrowserBridge.swift` z F1, `Notes/CaptureNote.swift` (Draft), v `App/AppDelegate.swift` funkci snímání (grep -n screencapture) a export, Templates.swift, SessionIndex.swift a PreviousSessions.swift (jen části o assets, obrázcích a hashích).
 
@@ -106,7 +106,7 @@ Na konci postupuj podle „Na konci fáze“ v docs/MAC-PHASES.md a vypiš promp
 ```text
 Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F3 z 5: nastavení redakce a UI.
 
-Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p3), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
+Repa: Mac worktree ../screenshot-note-browser (větev feat/browser-context-p3), rozšíření ..
 
 Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F3), docs/PRIVACY.md (Redakce, Cloud), CapturePolicy v src/lib/types.ts a src/lib/defaults.ts. V Mac repu: kde se ukládá konfigurace a složky a jejich UI (grep -n v Interface.swift a main.swift), BrowserBridge.swift a změny z F2 (git diff main --stat).
 
@@ -137,7 +137,7 @@ Na konci postupuj podle „Na konci fáze“ v docs/MAC-PHASES.md a vypiš promp
 ```text
 Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F4 z 5: přesný výřez snímku a mapování elementů.
 
-Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p4), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
+Repa: Mac worktree ../screenshot-note-browser (větev feat/browser-context-p4), rozšíření ..
 
 Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F4), docs/PROTOCOL.md (Mapování elementů). V Mac repu: funkci snímání v `Sources/ScreenshotNoteKit/App/AppDelegate.swift` (grep -n screencapture) a uložení kontextu z F2.
 
@@ -170,7 +170,7 @@ Na konci postupuj podle „Na konci fáze“ v docs/MAC-PHASES.md a vypiš promp
 ```text
 Pracujeme na propojení Screenshot Note (macOS) s Chrome rozšířením, fáze F5 z 5: anotace Element.
 
-Repa: Mac worktree /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-browser (větev feat/browser-context-p5), rozšíření /Users/janprasil/git/personal/screenshot-note-project/screenshot-note-chrome-extension.
+Repa: Mac worktree ../screenshot-note-browser (větev feat/browser-context-p5), rozšíření ..
 
 Nejdřív přečti v rozšíření: docs/MAC-PHASES.md (společná pravidla + F5), docs/PROTOCOL.md (Mapování, anotace). V Mac repu: `Sources/ScreenshotNoteKit/Annotations/Annotations.swift` a `AnnotationGeometry.swift` celé (jsou malé), přepočet elementů z F4, export poznámek pod obrázkem.
 

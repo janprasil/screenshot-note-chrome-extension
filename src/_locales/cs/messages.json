@@ -2,13 +2,13 @@
   "name": { "message": "Screenshot Note Context" },
   "description": { "message": "Přidává ke snímkům ze Screenshot Note konzoli, síťové požadavky a prvky stránky." },
   "recording": { "message": "Nahrávat konzoli a síť" },
-  "recordBodies": { "message": "Nahrávat těla odpovědí (text a JSON)" },
+  "recordBodies": { "message": "Nahrávat těla požadavků a odpovědí (text a JSON, včetně formulářů)" },
   "buffer": { "message": "Uchovat posledních" },
   "minutes": { "message": "min" },
   "appConnected": { "message": "Připojeno ke Screenshot Note" },
   "appDisconnected": { "message": "Screenshot Note není připojený" },
   "reconnect": { "message": "Připojit znovu" },
   "export": { "message": "Stáhnout kontext této záložky" },
-  "exportHint": { "message": "Cookies a autorizační hlavičky se ve staženém souboru skryjí." },
+  "exportHint": { "message": "Cookies, autorizační hlavičky a známá pole s tokeny se ve staženém souboru skryjí." },
   "exportFailed": { "message": "Export selhal" }
 }

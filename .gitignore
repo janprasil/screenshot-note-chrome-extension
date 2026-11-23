@@ -3,3 +3,4 @@ dist/
 *.zip
 .DS_Store
 dev-host/run-host.sh
+dist-store/

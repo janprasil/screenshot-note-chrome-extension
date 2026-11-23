@@ -8,7 +8,7 @@ elementu) zatím chybí.
 
 ```text
 Chrome tab ──(MAIN world: inject.js)── console, errors, fetch/XHR
-     │                                     │ CustomEvent (JSON)
+     │                                     │ MessageChannel (JSON text)
      └─(isolated: content.js) ring buffer ◄┘, element map, geometry
                 │ chrome.tabs.sendMessage
 background.js ── webRequest ring buffer per tab, redakce, HAR, bundle

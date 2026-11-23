@@ -68,6 +68,8 @@ export interface FakeChromeOptions {
   windows?: FakeWindow[];
   // Odpověď content scriptu na collect, podle ID záložky.
   collect?: (tabId: number) => unknown;
+  // Odpověď content scriptu na recorder-status, podle ID záložky.
+  recorderStatus?: (tabId: number) => unknown;
 }
 
 export function installFakeChrome(options: FakeChromeOptions = {}) {
@@ -105,8 +107,26 @@ export function installFakeChrome(options: FakeChromeOptions = {}) {
         if (!tab) throw new Error('No tab');
         return structuredClone(tab);
       },
-      sendMessage: async (tabId: number) => options.collect?.(tabId),
+      sendMessage: async (tabId: number, message: any) => (message?.type === 'recorder-status' ? options.recorderStatus?.(tabId) : options.collect?.(tabId)),
+      query: async () => structuredClone(allTabs()),
       onRemoved: new FakeEvent(),
+    },
+    scripting: {
+      registered: [] as any[],
+      injected: [] as any[],
+      async getRegisteredContentScripts({ ids }: { ids: string[] }) {
+        return this.registered.filter((script: any) => ids.includes(script.id));
+      },
+      async registerContentScripts(scripts: any[]) {
+        this.registered.push(...scripts);
+      },
+      async unregisterContentScripts({ ids }: { ids: string[] }) {
+        this.registered = this.registered.filter((script: any) => !ids.includes(script.id));
+      },
+      async executeScript(injection: any) {
+        this.injected.push(injection);
+        return [];
+      },
     },
     windows: { getAll: async () => structuredClone(windows) },
     webRequest: {
@@ -142,20 +162,62 @@ export async function loadBackground(options: FakeChromeOptions = {}) {
 
 let contentInstance = 0;
 
+/** MessagePort v paměti; skutečný port v Node drží event loop a testy by nedoběhly. */
+class FakePort {
+  other?: FakePort;
+  closed = false;
+  onmessage: ((event: { data: unknown }) => void) | null = null;
+  postMessage(data: unknown): void {
+    const target = this.other;
+    const copy = structuredClone(data);
+    setTimeout(() => {
+      if (!this.closed && target && !target.closed) target.onmessage?.({ data: copy });
+    }, 0);
+  }
+  close(): void {
+    this.closed = true;
+  }
+}
+
+class FakeMessageChannel {
+  port1 = new FakePort();
+  port2 = new FakePort();
+  constructor() {
+    this.port1.other = this.port2;
+    this.port2.other = this.port1;
+  }
+}
+
 /** Načte content.ts s minimálním document a window. */
 export async function loadContent(settings: Record<string, unknown> = { enabled: true, recordBodies: false, bufferMs: 300_000 }) {
   const fake = installFakeChrome({ settings });
   const document = new EventTarget() as EventTarget & { title: string };
   document.title = 'Page';
-  const window: Record<string, unknown> = { screenX: 0, screenY: 0, outerWidth: 1200, outerHeight: 800, innerWidth: 1200, innerHeight: 700, devicePixelRatio: 2, scrollX: 0, scrollY: 0 };
+  const window = Object.assign(new EventTarget(), { screenX: 0, screenY: 0, outerWidth: 1200, outerHeight: 800, innerWidth: 1200, innerHeight: 700, devicePixelRatio: 2, scrollX: 0, scrollY: 0 }) as any;
   window.top = window;
-  Object.assign(globalThis, { document, window, location: { href: 'https://app.example.com/' } });
+  window.postMessage = (data: unknown, _origin: string, transfer: MessagePort[] = []) => {
+    window.dispatchEvent(Object.assign(new Event('message'), { data, source: window, ports: transfer }));
+  };
+  Object.assign(globalThis, { document, window, location: { href: 'https://app.example.com/' }, MessageChannel: FakeMessageChannel });
+  // Simulovaný MAIN skript: převezme port z handshaku a potvrdí ho.
+  let mainPort: FakePort | undefined;
+  const config: any[] = [];
+  window.addEventListener('message', (event: any) => {
+    if (mainPort || event.data?.type !== 'screenshot-note:hello' || !event.ports[0]) return;
+    mainPort = event.ports[0] as FakePort;
+    mainPort.onmessage = (message) => config.push(message.data);
+    mainPort.postMessage({ type: 'screenshot-note:ack' });
+  });
   await import(`../src/content.ts?instance=${++contentInstance}`);
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  const emit = (entry: unknown) => document.dispatchEvent(new CustomEvent('screenshot-note:entry', { detail: JSON.stringify(entry) }));
-  const collect = () =>
-    new Promise<any>((resolve) => {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const emit = (entry: unknown) => mainPort!.postMessage(JSON.stringify(entry));
+  // Zprávy přes port jsou asynchronní, collect počká na jejich doručení.
+  const collect = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return new Promise<any>((resolve) => {
       fake.chrome.runtime.onMessage.fire({ type: 'collect', since: 0, includeElements: false, includeElementText: false }, {}, resolve);
     });
-  return { ...fake, emit, collect, document };
+  };
+  const status = () => new Promise<any>((resolve) => fake.chrome.runtime.onMessage.fire({ type: 'recorder-status' }, {}, resolve));
+  return { ...fake, emit, collect, status, config, window, document };
 }

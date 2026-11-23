@@ -1,18 +1,20 @@
 // Isolated-world content script: buffers page events and answers collect requests.
 import { DEFAULT_SETTINGS } from './lib/defaults.ts';
 import { collectElements, pageGeometry } from './lib/elements.ts';
+import { CHANNEL_ACK, CHANNEL_HELLO, CHANNEL_READY, isChannelMessage, type ChannelConfig } from './lib/page-channel.ts';
 import { MAX_BUFFER_CHARS, entrySize, sanitizePageEntry } from './lib/page-entry.ts';
 import { RingBuffer } from './lib/ring-buffer.ts';
 import type { PageEntry, PageInfo, RecorderSettings } from './lib/types.ts';
-
-const ENTRY_EVENT = 'screenshot-note:entry';
-const CONFIG_EVENT = 'screenshot-note:config';
 
 export interface CollectRequest {
   type: 'collect';
   since: number;
   includeElements: boolean;
   includeElementText: boolean;
+}
+
+export interface RecorderStatusRequest {
+  type: 'recorder-status';
 }
 
 export interface CollectResponse {
@@ -27,24 +29,51 @@ const MAX_EVENT_CHARS = 4 * 1024 * 1024;
 const buffer = new RingBuffer<PageEntry>(2_000, DEFAULT_SETTINGS.bufferMs, MAX_BUFFER_CHARS, entrySize);
 let settings: RecorderSettings = DEFAULT_SETTINGS;
 
-document.addEventListener(ENTRY_EVENT, (event) => {
-  if (!settings.enabled) return;
+let port: MessagePort | undefined;
+// MAIN skript potvrdil port, další handshake se už nepřijme.
+let connected = false;
+
+function onEntry(data: unknown): void {
+  if (!settings.enabled || typeof data !== 'string' || data.length > MAX_EVENT_CHARS) return;
   try {
-    const detail = (event as CustomEvent).detail;
-    if (typeof detail !== 'string' || detail.length > MAX_EVENT_CHARS) return;
-    const entry = sanitizePageEntry(JSON.parse(detail));
+    const entry = sanitizePageEntry(JSON.parse(data));
     if (entry) buffer.push(settings.recordBodies ? entry : withoutBodies(entry));
   } catch {
-    // The page can dispatch this event too, ignore garbage.
+    // Ignore garbage.
   }
+}
+
+function connect(): void {
+  port?.close();
+  const channel = new MessageChannel();
+  port = channel.port1;
+  port.onmessage = (event: MessageEvent) => {
+    if (typeof event.data === 'object' && event.data?.type === CHANNEL_ACK) {
+      connected = true;
+      sendConfig();
+      return;
+    }
+    onEntry(event.data);
+  };
+  window.postMessage({ type: CHANNEL_HELLO }, '*', [channel.port2]);
+}
+
+function sendConfig(): void {
+  const config: ChannelConfig = { type: 'config', enabled: settings.enabled, recordBodies: settings.recordBodies };
+  if (connected) port?.postMessage(config);
+}
+
+window.addEventListener('message', (event) => {
+  if (!connected && isChannelMessage(event, CHANNEL_READY)) connect();
 });
+connect();
 
 function applySettings(next: RecorderSettings): void {
   settings = { ...DEFAULT_SETTINGS, ...next };
   buffer.setMaxAge(settings.bufferMs);
   if (!settings.enabled) buffer.clear();
   if (!settings.recordBodies) buffer.replace(buffer.toArray().map(withoutBodies));
-  document.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: JSON.stringify(settings) }));
+  sendConfig();
 }
 
 // Bez zapnutého nahrávání těl se těla requestů neukládají.
@@ -68,8 +97,13 @@ function safeElements(includeText: boolean): ReturnType<typeof collectElements> 
   }
 }
 
-chrome.runtime.onMessage.addListener((message: CollectRequest, _sender, respond) => {
-  if (message?.type !== 'collect' || window.top !== window) return false;
+chrome.runtime.onMessage.addListener((message: CollectRequest | RecorderStatusRequest, _sender, respond) => {
+  if (window.top !== window) return false;
+  if (message?.type === 'recorder-status') {
+    respond({ connected });
+    return false;
+  }
+  if (message?.type !== 'collect') return false;
   buffer.prune();
   const response: CollectResponse = {
     page: {

@@ -26,6 +26,7 @@ const ready = (async () => {
   const { settings: stored } = await chrome.storage.local.get('settings');
   settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
   registerBodyListener();
+  void syncPageRecorder(false);
   const saved = await chrome.storage.session.get(null);
   for (const [key, value] of Object.entries(saved)) {
     if (!key.startsWith('net:')) continue;
@@ -38,7 +39,9 @@ const ready = (async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes.settings) return;
+  const wasEnabled = settings.enabled;
   settings = { ...DEFAULT_SETTINGS, ...(changes.settings.newValue ?? {}) };
+  void syncPageRecorder(!wasEnabled && settings.enabled);
   for (const state of tabs.values()) state.buffer.setMaxAge(settings.bufferMs);
   registerBodyListener();
   if (!settings.recordBodies) clearBodies();
@@ -47,6 +50,33 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void chrome.storage.session.clear();
   }
 });
+
+// ---------- page recorder (MAIN world) ----------
+
+const PAGE_RECORDER_ID = 'page-recorder';
+
+/** MAIN skript je ve stránkách jen při zapnutém nahrávání; po zapnutí se doplní do otevřených záložek. */
+async function syncPageRecorder(injectOpenTabs: boolean): Promise<void> {
+  try {
+    const registered = (await chrome.scripting.getRegisteredContentScripts({ ids: [PAGE_RECORDER_ID] })).length > 0;
+    if (settings.enabled && !registered) {
+      await chrome.scripting.registerContentScripts([
+        { id: PAGE_RECORDER_ID, js: ['inject.js'], matches: ['<all_urls>'], runAt: 'document_start', world: 'MAIN', persistAcrossSessions: true },
+      ]);
+    }
+    if (!settings.enabled && registered) await chrome.scripting.unregisterContentScripts({ ids: [PAGE_RECORDER_ID] });
+  } catch {
+    // Registrace se zopakuje při další změně nastavení nebo startu workeru.
+  }
+  if (!settings.enabled || !injectOpenTabs) return;
+  for (const tab of await chrome.tabs.query({})) {
+    if (tab.id === undefined || !/^https?:/.test(tab.url ?? '')) continue;
+    // Záložka bez content scriptu nebo s už připojeným recorderem se přeskočí.
+    const status = (await chrome.tabs.sendMessage(tab.id, { type: 'recorder-status' }, { frameId: 0 }).catch(() => undefined)) as { connected?: boolean } | undefined;
+    if (!status || status.connected) continue;
+    await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: [0] }, world: 'MAIN', files: ['inject.js'] }).catch(() => undefined);
+  }
+}
 
 function tabState(tabId: number) {
   let state = tabs.get(tabId);

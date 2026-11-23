@@ -1,5 +1,5 @@
 // Development stand-in for the Mac app bridge. Chrome starts it, `kill -USR1 <pid>` asks for a capture.
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,7 +10,14 @@ chmodSync(outDir, 0o700);
 const pidFile = join(outDir, 'host.pid');
 writeFileSync(pidFile, String(process.pid), { mode: 0o600 });
 // Neplatné PID by po skončení mohl dostat cizí proces.
-process.on('exit', () => rmSync(pidFile, { force: true }));
+// Soubor se smaže, jen když pořád patří tomuto procesu.
+process.on('exit', () => {
+  try {
+    if (readFileSync(pidFile, 'utf8') === String(process.pid)) rmSync(pidFile, { force: true });
+  } catch {
+    // Soubor už neexistuje.
+  }
+});
 
 let pending = Buffer.alloc(0);
 let counter = 0;

@@ -6,6 +6,7 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7ZgZYUtZrkWtaquAl664ttfO/yRHn6hifzXWdpet0R1LDddN9NAcYh69yFbcLLKJP2n0HkDd2j66Hk9IlQmbtvT9MTQFCprnwyEhw7burKS1yhoc/b/mEulW0LcwDibrUESRIpHxSo7PN7Id4Dewadzjc7vzR9IFe2OCvCfwF2DIyNAh5FM0f9/ZaDv/u679d0XgVHhWjpafTqdvMOXcmX8eViBzwGKoPwUlbi29MKOfBxmjUmaTQFE5yf1QzwYciy8MxKCKLk6bZYCBWX+txXe36f7P4dxWuW+gm+rrk1zeDL1M7xj+oSnxsfxdEltgTR7hvqRdfA61BlsPbj/jvQIDAQAB",
   "default_locale": "en",
   "minimum_chrome_version": "116",
+  "incognito": "not_allowed",
   "permissions": ["webRequest", "storage", "nativeMessaging", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },

@@ -13,7 +13,7 @@ This document describes what the extension records, where it keeps it and how it
 - Switching bodies off deletes all stored bodies immediately.
 - Switching recording off deletes all buffers immediately.
 - Entries older than the configured window are pruned on the next entry in the tab and, from session storage, when the service worker wakes up. An idle tab keeps them in memory until the worker is suspended.
-- Incognito windows are never exported, even when the user allows the extension in incognito mode.
+- The extension cannot run in incognito windows (`"incognito": "not_allowed"`), and incognito tabs are never exported.
 
 ## Redaction
 

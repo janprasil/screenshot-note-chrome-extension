@@ -2,6 +2,8 @@
 
 ## Release steps
 
+Steps 1–3 are done: the item ID is `ncpmdpnmhemklklkakeonmkhoclfngjk`.
+
 1. Create the item in the Developer Dashboard and upload the output of `npm run package:store` (a zip without `key`).
 2. The Store assigns the extension ID. Put its public key (Package → Public key) into `src/manifest.json` as `key`, so the development build has the same ID as the Store build.
 3. The Mac app and `dev-host/install.sh` list only that ID in `allowed_origins`. Remove the old development ID.

@@ -3,7 +3,7 @@
   "name": "__MSG_name__",
   "description": "__MSG_description__",
   "version": "0.1.0",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7ZgZYUtZrkWtaquAl664ttfO/yRHn6hifzXWdpet0R1LDddN9NAcYh69yFbcLLKJP2n0HkDd2j66Hk9IlQmbtvT9MTQFCprnwyEhw7burKS1yhoc/b/mEulW0LcwDibrUESRIpHxSo7PN7Id4Dewadzjc7vzR9IFe2OCvCfwF2DIyNAh5FM0f9/ZaDv/u679d0XgVHhWjpafTqdvMOXcmX8eViBzwGKoPwUlbi29MKOfBxmjUmaTQFE5yf1QzwYciy8MxKCKLk6bZYCBWX+txXe36f7P4dxWuW+gm+rrk1zeDL1M7xj+oSnxsfxdEltgTR7hvqRdfA61BlsPbj/jvQIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4SVll7CkKdJGIrjF1AwdcAMW8KaT8BySmYsnj6mTOQR3y7o/5jA8r/Bfp+9o6PKMBnYwuAOMT67hcpxCRsEHWeTy4s1BjokgUA8Azq59ymGl0CKh1zq1aCATA64Rs/4xXIl0dkYkP1q1bEHW0ZzksOqb2Yr7/pOGF+7Ja6SePY5h/OKkX8vmk7+KOG1bxF/nCD3Qvk8NLofcgw0QtJEAfmHEWK7HbDPoGJTLnudi7QTcJrly37CM4jPl8TOrW9joUvo4S14juvXiOnGbVJ5b/pT/hwy6Vzw5KcIFGy+t2lCULksRYybqW5SvbDZVAgeEuxjsWnLo4WMGm+kU0CvLbQIDAQAB",
   "default_locale": "en",
   "minimum_chrome_version": "116",
   "incognito": "not_allowed",

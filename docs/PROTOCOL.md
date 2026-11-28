@@ -30,8 +30,8 @@ Screenshot Note.app ── attaches the context to the screenshot
   - Arc: `~/Library/Application Support/Arc/User Data/NativeMessagingHosts/`
   - Chromium: `~/Library/Application Support/Chromium/NativeMessagingHosts/`
   - It writes only where the browser's Application Support directory exists.
-- `allowed_origins` contains only the Chrome Web Store extension ID and the development build ID.
-- Development build ID: `hffkngdjiopodemokmgiedickoiehidb` (fixed by `key` in `src/manifest.json`; the private key is not in the repository).
+- `allowed_origins` contains only the extension ID below.
+- Extension ID: `ncpmdpnmhemklklkakeonmkhoclfngjk`, shared by the Chrome Web Store and development builds (`key` in `src/manifest.json` is the Store's public key).
 - `path` points to `Screenshot Note.app/Contents/MacOS/screenshot-note-bridge`. The manifest is rewritten when the app moves.
 - `dev-host/` provides a host for development (see README).
 
